@@ -88,6 +88,17 @@ export type WorkoutExercise = {
   notes: string | null
 }
 
+export const PAIN_REGIONS = [
+  'Joelho',
+  'Quadril',
+  'Lombar',
+  'Ombro',
+  'Punho',
+  'Cotovelo',
+  'Tornozelo',
+  'Pescoço',
+] as const
+
 export type RecoveryCheckin = {
   id: string
   student_id: string
@@ -96,10 +107,16 @@ export type RecoveryCheckin = {
   diastolic_bp: number | null
   heart_rate: number | null
   spo2: number | null
+  sleep_hours: number | null
   sleep_quality: number | null
   energy_level: number | null
+  disposition: number | null
+  stress_level: number | null
   pain_level: number | null
+  pain_regions: string[] | null
   fatigue_level: number | null
+  vo2_initial: number | null
+  double_product_pre: number | null
   symptoms: string[] | null
   notes: string | null
 }
@@ -112,6 +129,21 @@ export type WorkoutSession = {
   duration_minutes: number | null
   rpe: number | null
   session_load: number | null
+  heart_rate_pre: number | null
+  heart_rate_post: number | null
+  heart_rate_max: number | null
+  systolic_bp_pre: number | null
+  systolic_bp_post: number | null
+  diastolic_bp_pre: number | null
+  diastolic_bp_post: number | null
+  spo2_pre: number | null
+  spo2_post: number | null
+  double_product_pre: number | null
+  double_product_post: number | null
+  vo2_initial: number | null
+  vo2_final: number | null
+  feedback: string | null
+  recovery_perception: number | null
   symptoms: string[] | null
   notes: string | null
 }
