@@ -16,6 +16,8 @@ import { PAIN_REGIONS } from '../types'
 import EvolutionChart from '../components/EvolutionChart'
 import { CardioTab, PeriodizacaoTab } from './CardioPeriodizacao'
 import { AnamneseTab, PresencaTab, TestesFuncionaisTab } from './AnamneseAvancada'
+import { IpcTab } from './IpcModule'
+import { TreinosTab } from './TreinosModule'
 
 const TABS = [
   'Geral',
@@ -335,72 +337,6 @@ function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId
   )
 }
 
-// ---------------- TREINOS ----------------
-function TreinosTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
-  const [plans, setPlans] = useState<WorkoutPlan[]>([])
-  const [name, setName] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const load = async () => {
-    const { data } = await supabase
-      .from('workout_plans')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false } as any)
-    setPlans(data ?? [])
-  }
-
-  useEffect(() => {
-    load()
-  }, [studentId])
-
-  const create = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    const { error } = await supabase.from('workout_plans').insert({
-      student_id: studentId,
-      owner_id: ownerId,
-      name,
-    })
-    setSaving(false)
-    if (!error) {
-      setName('')
-      load()
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <form onSubmit={create} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3">
-        <input
-          className="input flex-1"
-          placeholder="Nome do treino (ex: Treino A)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <button disabled={saving} className="btn-primary">
-          {saving ? 'Salvando...' : 'Criar treino'}
-        </button>
-      </form>
-
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {plans.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhum treino criado ainda.</p>}
-        {plans.map((p) => (
-          <div key={p.id} className="p-4 text-sm flex justify-between items-center">
-            <span className="font-medium text-slate-900">{p.name}</span>
-            <span className={`text-xs px-2 py-1 rounded-full ${p.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-              {p.active ? 'ativo' : 'inativo'}
-            </span>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-slate-400">
-        Exercícios de cada treino (séries, repetições, carga, RPE) ficam na tabela workout_exercises — próxima iteração da interface.
-      </p>
-    </div>
-  )
-}
 
 // ---------------- SESSÃO (Sessão / Recuperação / IPC) ----------------
 const PAIN_REGIONS_SESSION = PAIN_REGIONS
@@ -524,7 +460,7 @@ function SessoesTab({ studentId, ownerId }: { studentId: string; ownerId: string
       </div>
       {sub === 'Sessão' && <SessaoForm studentId={studentId} ownerId={ownerId} />}
       {sub === 'Recuperação' && <RecuperacaoModule studentId={studentId} ownerId={ownerId} />}
-      {sub === 'IPC' && <IpcTab studentId={studentId} />}
+      {sub === 'IPC' && <IpcTab studentId={studentId} ownerId={ownerId} />}
     </div>
   )
 }
@@ -1102,48 +1038,6 @@ function RecuperacaoDashboard({ studentId }: { studentId: string }) {
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-// ---- Sub-aba "IPC": Índice de Prontidão Cardiovascular (interno, apoio à decisão) ----
-function IpcTab({ studentId }: { studentId: string }) {
-  const [last, setLast] = useState<RecoveryCheckin | null>(null)
-  useEffect(() => {
-    supabase
-      .from('recovery_checkins')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('checkin_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setLast(data as RecoveryCheckin | null))
-  }, [studentId])
-
-  if (!last) {
-    return <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl p-5">Sem check-in de recuperação recente para calcular o índice.</p>
-  }
-
-  // Heurística interna simples e transparente — nunca um escore clínico validado.
-  let score = 50
-  if (last.sleep_quality) score += (last.sleep_quality - 3) * 8
-  if (last.energy_level) score += (last.energy_level - 3) * 8
-  if (last.disposition) score += (last.disposition - 3) * 6
-  if (last.stress_level) score -= (last.stress_level - 3) * 6
-  if (last.pain_level !== null && last.pain_level !== undefined) score -= last.pain_level * 3
-  if (last.spo2 !== null && last.spo2 !== undefined && last.spo2 < 95) score -= (95 - last.spo2) * 4
-  score = Math.max(0, Math.min(100, Math.round(score)))
-  const level = score >= 70 ? 'verde' : score >= 40 ? 'amarelo' : 'vermelho'
-  const color = level === 'verde' ? 'text-green-600' : level === 'amarelo' ? 'text-amber-600' : 'text-red-600'
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6 text-center space-y-2">
-      <p className="text-xs text-slate-500">Índice interno de prontidão (apoio à decisão)</p>
-      <p className={`text-5xl font-bold ${color}`}>{score}</p>
-      <p className={`text-sm font-medium ${color}`}>{level.toUpperCase()}</p>
-      <p className="text-xs text-slate-400 max-w-sm mx-auto">
-        Calculado a partir do último check-in de recuperação. Não é um escore clínico validado nem substitui avaliação médica ou decisão profissional.
-      </p>
     </div>
   )
 }

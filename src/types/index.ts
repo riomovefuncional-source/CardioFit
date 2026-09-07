@@ -181,6 +181,12 @@ export type WorkoutExercise = {
   target_rpe: number | null
   order_index: number
   notes: string | null
+  cadence: string | null
+  description: string | null
+  block: string | null
+  format: string | null
+  percent_1rm: number | null
+  rir: number | null
 }
 
 export const PAIN_REGIONS = [
