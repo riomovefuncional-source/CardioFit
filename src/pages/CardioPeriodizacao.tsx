@@ -198,12 +198,25 @@ function epley1RM(load: number, reps: number) {
   return Math.round(load * (1 + reps / 30) * 10) / 10
 }
 
-const LINEAR_TABLE = [
-  { period: 1, sets: 2, reps: '8-10', intensity: 60, pse: '4-5' },
-  { period: 2, sets: 2, reps: '8-10', intensity: 65, pse: '5' },
-  { period: 3, sets: 2, reps: '6-8', intensity: 70, pse: '5-6' },
-  { period: 4, sets: 2, reps: '6-8', intensity: 75, pse: '6' },
-]
+const PERIOD_TABLES: Record<string, { period: string; sets: number; reps: string; intensity: number; pse: string; focus?: string }[]> = {
+  linear: [
+    { period: '1', sets: 2, reps: '8-10', intensity: 60, pse: '4-5' },
+    { period: '2', sets: 2, reps: '8-10', intensity: 65, pse: '5' },
+    { period: '3', sets: 2, reps: '6-8', intensity: 70, pse: '5-6' },
+    { period: '4', sets: 2, reps: '6-8', intensity: 75, pse: '6' },
+  ],
+  ondulatoria: [
+    { period: 'Dia 1', sets: 2, reps: '8-10', intensity: 60, pse: '4-5', focus: 'Volume' },
+    { period: 'Dia 2', sets: 2, reps: '6-8', intensity: 70, pse: '5-6', focus: 'Intensidade' },
+    { period: 'Dia 3', sets: 2, reps: '10-12', intensity: 55, pse: '4', focus: 'Resistência' },
+  ],
+  bissemanal: [
+    { period: 'S1-S2', sets: 2, reps: '8-10', intensity: 55, pse: '3-4' },
+    { period: 'S3-S4', sets: 2, reps: '8-10', intensity: 62, pse: '4-5' },
+    { period: 'S5-S6', sets: 2, reps: '6-8', intensity: 68, pse: '5' },
+    { period: 'S7-S8', sets: 2, reps: '6-8', intensity: 72, pse: '5-6' },
+  ],
+}
 
 export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }) {
   const [model, setModel] = useState<(typeof MODELS)[number]['id']>('linear')
@@ -252,42 +265,37 @@ export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }
         </div>
       </div>
 
-      {model === 'linear' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 overflow-x-auto">
-          <p className="text-sm font-semibold text-slate-800 mb-3">Tabela — Linear</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 text-xs">
-                <th className="pb-2">Período</th>
-                <th>Séries</th>
-                <th>Reps</th>
-                <th>Intensidade</th>
-                <th>PSE alvo</th>
-                <th>Carga alvo</th>
+      <div className="bg-white border border-slate-200 rounded-xl p-4 overflow-x-auto">
+        <p className="text-sm font-semibold text-slate-800 mb-3">Tabela — {activeModel.name}</p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-slate-500 text-xs">
+              <th className="pb-2">Período</th>
+              <th>Séries</th>
+              <th>Reps</th>
+              <th>Intensidade</th>
+              <th>PSE alvo</th>
+              <th>Carga alvo</th>
+              {model === 'ondulatoria' && <th>Foco</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {PERIOD_TABLES[model].map((row) => (
+              <tr key={row.period} className="border-t border-slate-100">
+                <td className="py-2">{row.period}</td>
+                <td>{row.sets}</td>
+                <td>{row.reps}</td>
+                <td>
+                  <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5">{row.intensity}%</span>
+                </td>
+                <td>{row.pse}</td>
+                <td>{oneRM ? Math.round((oneRM * row.intensity) / 100) : '—'}</td>
+                {model === 'ondulatoria' && <td className="text-xs text-slate-400">{row.focus ?? '—'}</td>}
               </tr>
-            </thead>
-            <tbody>
-              {LINEAR_TABLE.map((row) => (
-                <tr key={row.period} className="border-t border-slate-100">
-                  <td className="py-2">{row.period}</td>
-                  <td>{row.sets}</td>
-                  <td>{row.reps}</td>
-                  <td>
-                    <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5">{row.intensity}%</span>
-                  </td>
-                  <td>{row.pse}</td>
-                  <td>{oneRM ? Math.round((oneRM * row.intensity) / 100) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {model !== 'linear' && (
-        <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl p-5">
-          Tabela do modelo "{activeModel.name}" ainda não implementada — só a Linear tinha exemplo concreto na referência. Me diga a progressão desejada (séries/reps/intensidade por período) e eu construo.
-        </p>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-slate-800 mb-3">Distribuição da Sessão</p>
