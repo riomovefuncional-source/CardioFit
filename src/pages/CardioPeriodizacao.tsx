@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { PieChart, Pie, Cell, Legend, Tooltip as RTooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabaseClient'
 import type { CardioTest } from '../types'
 
@@ -218,7 +219,15 @@ const PERIOD_TABLES: Record<string, { period: string; sets: number; reps: string
   ],
 }
 
-export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }) {
+const LEVEL_ADJUSTMENTS = {
+  iniciante: { maxSets: 2, repRange: '8-10', maxIntensity: 65, freqLabel: '3×/semana' },
+  intermediario: { maxSets: 3, repRange: '8-12', maxIntensity: 75, freqLabel: '3-4×/semana' },
+  avancado: { maxSets: 3, repRange: '6-12', maxIntensity: 80, freqLabel: '4-5×/semana' },
+} as const
+
+const PIE_COLORS = ['#0f766e', '#f59e0b', '#dc2626', '#0284c7']
+
+export function PeriodizacaoTab({ studentId }: { studentId: string }) {
   const [model, setModel] = useState<(typeof MODELS)[number]['id']>('linear')
   const [calcLoad, setCalcLoad] = useState('')
   const [calcReps, setCalcReps] = useState('')
@@ -226,12 +235,56 @@ export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }
   const [hrMax, setHrMax] = useState('')
   const [sbp, setSbp] = useState('')
   const [dbp, setDbp] = useState('')
+  const [level, setLevel] = useState<keyof typeof LEVEL_ADJUSTMENTS>('iniciante')
+
+  useEffect(() => {
+    supabase
+      .from('students')
+      .select('training_level')
+      .eq('id', studentId)
+      .single()
+      .then(({ data }) => {
+        if (data?.training_level) setLevel(data.training_level as keyof typeof LEVEL_ADJUSTMENTS)
+      })
+  }, [studentId])
+
+  const changeLevel = async (l: keyof typeof LEVEL_ADJUSTMENTS) => {
+    setLevel(l)
+    await supabase.from('students').update({ training_level: l }).eq('id', studentId)
+  }
 
   const oneRM = epley1RM(Number(calcLoad), Number(calcReps))
   const activeModel = MODELS.find((m) => m.id === model)!
+  const adj = LEVEL_ADJUSTMENTS[level]
+
+  const dp = hrMax && sbp ? Number(hrMax) * Number(sbp) : null
+  const pieData = [
+    { name: 'Volume', value: oneRM ? Math.round(oneRM * adj.maxSets) : 40 },
+    { name: 'Intensidade', value: PERIOD_TABLES[model][PERIOD_TABLES[model].length - 1]?.intensity ?? 65 },
+    { name: 'PSE', value: pse ? Number(pse) * 10 : 50 },
+    { name: 'FC Máx', value: hrMax ? Math.min(100, Math.round((Number(hrMax) / 220) * 100)) : 70 },
+  ]
 
   return (
     <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <p className="text-sm font-semibold text-slate-800 mb-3">Nível de Treinamento do Aluno</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(['iniciante', 'intermediario', 'avancado'] as const).map((l) => (
+            <button
+              key={l}
+              onClick={() => changeLevel(l)}
+              className={`text-sm capitalize rounded-lg border py-2 ${level === l ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-400 mt-2">
+          Base cardio reab: {adj.freqLabel}, {adj.maxSets} séries × {adj.repRange} reps, até {adj.maxIntensity}% do 1RM.
+        </p>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-slate-800 mb-3">Modelo de Periodização</p>
         <div className="grid sm:grid-cols-3 gap-3">
@@ -263,6 +316,16 @@ export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }
             <input className="input bg-slate-50" disabled value={oneRM ?? '—'} />
           </Field>
         </div>
+        {oneRM && (
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            {[50, 60, 70, 80].map((pct) => (
+              <div key={pct} className="text-center p-2 rounded-lg bg-slate-50">
+                <p className="text-xs text-slate-400">{pct}%</p>
+                <p className="font-bold text-sm">{Math.round((oneRM * pct) / 100)} kg</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 overflow-x-auto">
@@ -280,26 +343,30 @@ export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }
             </tr>
           </thead>
           <tbody>
-            {PERIOD_TABLES[model].map((row) => (
-              <tr key={row.period} className="border-t border-slate-100">
-                <td className="py-2">{row.period}</td>
-                <td>{row.sets}</td>
-                <td>{row.reps}</td>
-                <td>
-                  <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5">{row.intensity}%</span>
-                </td>
-                <td>{row.pse}</td>
-                <td>{oneRM ? Math.round((oneRM * row.intensity) / 100) : '—'}</td>
-                {model === 'ondulatoria' && <td className="text-xs text-slate-400">{row.focus ?? '—'}</td>}
-              </tr>
-            ))}
+            {PERIOD_TABLES[model].map((row) => {
+              const cappedIntensity = Math.min(row.intensity, adj.maxIntensity)
+              const cappedSets = Math.min(row.sets, adj.maxSets)
+              return (
+                <tr key={row.period} className="border-t border-slate-100">
+                  <td className="py-2">{row.period}</td>
+                  <td>{cappedSets}</td>
+                  <td>{row.reps}</td>
+                  <td>
+                    <span className="text-xs bg-slate-100 rounded-full px-2 py-0.5">{cappedIntensity}%</span>
+                  </td>
+                  <td>{row.pse}</td>
+                  <td>{oneRM ? Math.round((oneRM * cappedIntensity) / 100) : '—'}</td>
+                  {model === 'ondulatoria' && <td className="text-xs text-slate-400">{row.focus ?? '—'}</td>}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-slate-800 mb-3">Distribuição da Sessão</p>
-        <div className="grid sm:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-4 gap-4 mb-4">
           <Field label="PSE">
             <input className="input" placeholder="0-10" value={pse} onChange={(e) => setPse(e.target.value)} />
           </Field>
@@ -313,9 +380,29 @@ export function PeriodizacaoTab({ studentId: _studentId }: { studentId: string }
             <input className="input" placeholder="Ex: 85" value={dbp} onChange={(e) => setDbp(e.target.value)} />
           </Field>
         </div>
-        <p className="text-xs text-slate-400 mt-2">
-          Volume total estimado, intensidade máxima recomendada e PSE médio dependem do histórico de sessões — ligar a essa tabela é o próximo passo natural (já temos os dados em workout_sessions).
-        </p>
+        <div className="grid sm:grid-cols-2 gap-4 items-center">
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name }: any) => name}>
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Legend />
+              <RTooltip />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-2 text-sm">
+            <div className="p-2 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-400">Intensidade máx. recomendada</p>
+              <p className="font-bold">{adj.maxIntensity}% do 1RM</p>
+            </div>
+            <div className="p-2 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-400">Duplo Produto final (est.)</p>
+              <p className="font-bold">{dp ?? '—'}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

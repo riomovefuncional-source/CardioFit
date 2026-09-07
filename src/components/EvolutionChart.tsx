@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend } from 'recharts'
 import { supabase } from '../lib/supabaseClient'
 
 type WeightPoint = { date: string; weight: number | null; bodyFat: number | null }
@@ -8,6 +8,7 @@ type LoadPoint = { date: string; load: number | null }
 export default function EvolutionChart({ studentId }: { studentId: string }) {
   const [weightData, setWeightData] = useState<WeightPoint[]>([])
   const [loadData, setLoadData] = useState<LoadPoint[]>([])
+  const [radarData, setRadarData] = useState<{ metric: string; inicial: number; atual: number }[]>([])
 
   useEffect(() => {
     supabase
@@ -37,6 +38,35 @@ export default function EvolutionChart({ studentId }: { studentId: string }) {
             load: d.session_load,
           }))
         )
+      })
+
+    // Comparativo inicial x atual — melhor resultado de cada tipo de teste funcional (primeiro vs mais recente)
+    supabase
+      .from('functional_test_results')
+      .select('test_type, test_date, primary_result')
+      .eq('student_id', studentId)
+      .order('test_date', { ascending: true })
+      .then(({ data }) => {
+        if (!data || data.length === 0) return
+        const byType: Record<string, { primary_result: number | null }[]> = {}
+        data.forEach((r) => {
+          byType[r.test_type] = byType[r.test_type] ?? []
+          byType[r.test_type].push(r)
+        })
+        const labelMap: Record<string, string> = {
+          chair_stand_30s: 'Força (M.I.)',
+          grip_strength: 'Força (Preensão)',
+          unipedal_stance: 'Equilíbrio',
+          tug: 'Mobilidade (TUG)',
+        }
+        const rows = Object.entries(byType)
+          .filter(([type]) => labelMap[type])
+          .map(([type, arr]) => ({
+            metric: labelMap[type],
+            inicial: arr[0]?.primary_result ?? 0,
+            atual: arr[arr.length - 1]?.primary_result ?? 0,
+          }))
+        setRadarData(rows)
       })
   }, [studentId])
 
@@ -76,6 +106,22 @@ export default function EvolutionChart({ studentId }: { studentId: string }) {
           </ResponsiveContainer>
         )}
       </div>
+
+      {radarData.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <p className="text-sm font-medium text-slate-700 mb-3">Comparativo Inicial × Atual (testes funcionais)</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <RadarChart data={radarData}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
+              <Radar name="Inicial" dataKey="inicial" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.2} />
+              <Radar name="Atual" dataKey="atual" stroke="#0d9488" fill="#0d9488" fillOpacity={0.3} />
+              <Legend />
+              <Tooltip />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   )
 }

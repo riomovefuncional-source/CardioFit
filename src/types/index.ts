@@ -11,6 +11,7 @@ export type Student = {
   occupation: string | null
   notes: string | null
   status: 'ativo' | 'inativo' | 'pausado'
+  training_level: 'iniciante' | 'intermediario' | 'avancado' | null
   entry_date: string
   user_id: string | null
   created_at: string

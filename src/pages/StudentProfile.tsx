@@ -18,6 +18,7 @@ import { CardioTab, PeriodizacaoTab } from './CardioPeriodizacao'
 import { AnamneseTab, PresencaTab, TestesFuncionaisTab } from './AnamneseAvancada'
 import { IpcTab } from './IpcModule'
 import { TreinosTab } from './TreinosModule'
+import { CalendarioTab } from './CalendarioModule'
 
 const TABS = [
   'Geral',
@@ -27,6 +28,7 @@ const TABS = [
   'Sessão',
   'Cardio',
   'Periodização',
+  'Calendário',
   'Presença',
   'Evolução',
   'Financeiro',
@@ -96,6 +98,7 @@ export default function StudentProfile() {
       {tab === 'Sessão' && <SessoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Cardio' && <CardioTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Periodização' && <PeriodizacaoTab studentId={id} />}
+      {tab === 'Calendário' && <CalendarioTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Presença' && <PresencaTab studentId={id} />}
       {tab === 'Evolução' && <EvolutionChart studentId={id} />}
       {tab === 'Financeiro' && <FinanceiroTab studentId={id} ownerId={session.user.id} />}

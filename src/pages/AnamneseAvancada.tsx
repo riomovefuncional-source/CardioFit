@@ -730,6 +730,7 @@ const TEST_TYPES = [
   { id: 'chair_stand_30s', label: 'Sentar e Levantar (30s)' },
   { id: 'grip_strength', label: 'Preensão Manual (Dinamometria)' },
   { id: 'unipedal_stance', label: 'Equilíbrio Unipodal' },
+  { id: 'tug', label: 'Timed Up and Go (TUG)' },
 ] as const
 
 const CHAIR_STAND_REFERENCE = [
@@ -774,6 +775,7 @@ export function TestesFuncionaisTab({ studentId, ownerId }: { studentId: string;
       {testType === 'chair_stand_30s' && <ChairStandForm studentId={studentId} ownerId={ownerId} previous={previous} onSaved={load} />}
       {testType === 'grip_strength' && <GripStrengthForm studentId={studentId} ownerId={ownerId} previous={previous} onSaved={load} />}
       {testType === 'unipedal_stance' && <UnipedalStanceForm studentId={studentId} ownerId={ownerId} previous={previous} onSaved={load} />}
+      {testType === 'tug' && <TugForm studentId={studentId} ownerId={ownerId} previous={previous} onSaved={load} />}
 
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-slate-800 mb-2">Histórico</p>
@@ -1083,6 +1085,107 @@ function UnipedalStanceForm({ studentId, ownerId, previous, onSaved }: { student
       </Field>
       <ComparisonNote previous={previous?.primary_result ?? null} current={best} />
       <p className="text-xs text-slate-400">Referência: Springer BA, Marin R, Cyhan T, Roberts H, Gill NW. Normative Values for the Unipedal Stance Test with Eyes Open and Closed. Journal of Geriatric Physical Therapy. 2007;30(1):8-15.</p>
+      <button disabled={saving} className="btn-primary w-full">
+        {saving ? 'Salvando...' : 'Salvar Teste'}
+      </button>
+    </form>
+  )
+}
+
+function TugForm({ studentId, ownerId, previous, onSaved }: { studentId: string; ownerId: string; previous: FunctionalTestResult | null; onSaved: () => void }) {
+  const [t1, setT1] = useState('')
+  const [t2, setT2] = useState('')
+  const [assistiveDevice, setAssistiveDevice] = useState(false)
+  const [armSupport, setArmSupport] = useState(false)
+  const [instability, setInstability] = useState(false)
+  const [lostBalance, setLostBalance] = useState(false)
+  const [symptoms, setSymptoms] = useState('')
+  const [pse, setPse] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const best = [t1, t2].filter(Boolean).map(Number).length ? Math.min(...[t1, t2].filter(Boolean).map(Number)) : null
+
+  const interpretation =
+    best === null
+      ? null
+      : best < 10
+        ? { text: 'Normal', tone: 'ok' as const }
+        : best <= 14
+          ? { text: 'Risco moderado', tone: 'amarelo' as const }
+          : { text: 'Alto risco de queda', tone: 'vermelho' as const }
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await supabase.from('functional_test_results').insert({
+      student_id: studentId,
+      owner_id: ownerId,
+      test_type: 'tug',
+      primary_result: best,
+      primary_unit: 'segundos',
+      parameters: { t1, t2, assistiveDevice, armSupport, instability, lostBalance, symptoms, pse },
+      notes: notes || null,
+    })
+    setSaving(false)
+    setT1('')
+    setT2('')
+    setNotes('')
+    onSaved()
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+      <p className="text-sm font-semibold text-slate-800">🚶 Timed Up and Go (TUG)</p>
+      <div className="grid sm:grid-cols-3 gap-4">
+        <Field label="Tentativa 1 (s)">
+          <input className="input" type="number" step="0.1" value={t1} onChange={(e) => setT1(e.target.value)} />
+        </Field>
+        <Field label="Tentativa 2 (s)">
+          <input className="input" type="number" step="0.1" value={t2} onChange={(e) => setT2(e.target.value)} />
+        </Field>
+        <Field label="Melhor tempo">
+          <input className="input bg-slate-50" disabled value={best ?? '—'} />
+        </Field>
+        <Field label="PSE">
+          <input className="input" type="number" min={0} max={10} value={pse} onChange={(e) => setPse(e.target.value)} />
+        </Field>
+      </div>
+      <div className="flex flex-wrap gap-4 text-sm">
+        {(
+          [
+            [assistiveDevice, setAssistiveDevice, 'Uso de dispositivo auxiliar'],
+            [armSupport, setArmSupport, 'Apoio dos braços'],
+            [instability, setInstability, 'Instabilidade'],
+            [lostBalance, setLostBalance, 'Perda de equilíbrio'],
+          ] as const
+        ).map(([val, setter, label], i) => (
+          <label key={i} className="flex items-center gap-1">
+            <input type="checkbox" checked={val} onChange={(e) => setter(e.target.checked)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <Field label="Sintomas">
+        <input className="input" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} />
+      </Field>
+      <Field label="Observações">
+        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </Field>
+
+      {interpretation && (
+        <p
+          className={`text-xs rounded-lg px-3 py-2 ${
+            interpretation.tone === 'ok' ? 'bg-green-50 text-green-700' : interpretation.tone === 'amarelo' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+          }`}
+        >
+          {interpretation.text} — a interpretação deve considerar idade, população, protocolo e contexto clínico; não é um diagnóstico automático.
+        </p>
+      )}
+
+      <ComparisonNote previous={previous?.primary_result ?? null} current={best} higherIsBetter={false} />
+      <p className="text-xs text-slate-400">Referência: CDC STEADI / literatura científica específica do TUG.</p>
+
       <button disabled={saving} className="btn-primary w-full">
         {saving ? 'Salvando...' : 'Salvar Teste'}
       </button>
