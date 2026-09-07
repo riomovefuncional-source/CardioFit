@@ -192,3 +192,23 @@ export type Payment = {
   status: 'pago' | 'pendente' | 'atrasado' | 'parcial' | 'cancelado'
   notes: string | null
 }
+
+export type CardioTest = {
+  id: string
+  student_id: string
+  test_date: string
+  protocol: string | null
+  total_time_minutes: number | null
+  borg_max: number | null
+  hr_rest: number | null
+  hr_peak: number | null
+  sbp_rest: number | null
+  sbp_peak: number | null
+  met_max: number | null
+  vo2_peak: number | null
+  hr_ischemia: number | null
+  hr_angina: number | null
+  hr_arrhythmia: number | null
+  hr_limitation: number | null
+  stop_reason: string | null
+}

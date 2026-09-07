@@ -15,6 +15,7 @@ import type {
 } from '../types'
 import { PAIN_REGIONS } from '../types'
 import EvolutionChart from '../components/EvolutionChart'
+import { CardioTab, PeriodizacaoTab } from './CardioPeriodizacao'
 
 const TABS = [
   'Geral',
@@ -22,6 +23,8 @@ const TABS = [
   'Avaliações',
   'Treinos',
   'Sessão',
+  'Cardio',
+  'Periodização',
   'Evolução',
   'Financeiro',
   'Alertas',
@@ -88,6 +91,8 @@ export default function StudentProfile() {
       {tab === 'Avaliações' && <AvaliacoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Treinos' && <TreinosTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Sessão' && <SessoesTab studentId={id} ownerId={session.user.id} />}
+      {tab === 'Cardio' && <CardioTab studentId={id} ownerId={session.user.id} />}
+      {tab === 'Periodização' && <PeriodizacaoTab studentId={id} />}
       {tab === 'Evolução' && <EvolutionChart studentId={id} />}
       {tab === 'Financeiro' && <FinanceiroTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Alertas' && <AlertasTab studentId={id} />}
