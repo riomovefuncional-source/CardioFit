@@ -8,6 +8,8 @@ import StudentProfile from './pages/StudentProfile'
 import Financeiro from './pages/Financeiro'
 import Configuracoes from './pages/Configuracoes'
 import AlunoApp from './pages/AlunoApp'
+import PresencaGlobal from './pages/PresencaGlobal'
+import AvaliacaoGlobal from './pages/AvaliacaoGlobal'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -38,6 +40,8 @@ function Routed() {
         <Route path="/alunos" element={<Students />} />
         <Route path="/alunos/:id" element={<StudentProfile />} />
         <Route path="/financeiro" element={<Financeiro />} />
+        <Route path="/presenca" element={<PresencaGlobal />} />
+        <Route path="/avaliacoes" element={<AvaliacaoGlobal />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
       </Route>
     </Routes>

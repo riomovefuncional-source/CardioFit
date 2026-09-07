@@ -48,7 +48,7 @@ export default function Login() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C89116]/100"
               />
             </div>
           )}
@@ -59,7 +59,7 @@ export default function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C89116]/100"
             />
           </div>
           <div>
@@ -70,7 +70,7 @@ export default function Login() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C89116]/100"
             />
           </div>
 
@@ -80,7 +80,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-teal-600 text-white py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-[#731919] text-white py-2 text-sm font-medium hover:bg-[#731919] disabled:opacity-50"
           >
             {loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
           </button>
@@ -88,7 +88,7 @@ export default function Login() {
 
         <button
           onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-          className="mt-4 text-sm text-teal-700 hover:underline"
+          className="mt-4 text-sm text-[#731919] hover:underline"
         >
           {mode === 'login' ? 'Não tem conta? Criar conta' : 'Já tem conta? Entrar'}
         </button>

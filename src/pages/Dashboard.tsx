@@ -13,7 +13,7 @@ type Stats = {
 
 function Card({ label, value, href }: { label: string; value: number | string; href?: string }) {
   const content = (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-teal-300 transition-colors">
+    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-[#C89116]/60 transition-colors">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
     </div>

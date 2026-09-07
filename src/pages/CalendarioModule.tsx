@@ -69,7 +69,7 @@ export function CalendarioTab({ studentId, ownerId }: { studentId: string; owner
         {plans.slice(0, 3).map((p) => (
           <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3 text-center">
             <p className="text-xs text-slate-500">{p.name}</p>
-            <p className="text-2xl font-bold text-teal-700">{countByPlan[p.name] ?? 0}x</p>
+            <p className="text-2xl font-bold text-[#731919]">{countByPlan[p.name] ?? 0}x</p>
           </div>
         ))}
         <div className="bg-white border border-slate-200 rounded-xl p-3 text-center">
@@ -114,8 +114,8 @@ export function CalendarioTab({ studentId, ownerId }: { studentId: string; owner
                 key={day.toISOString()}
                 onClick={() => setSelectedDay(isSelected ? null : day)}
                 className={`relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs ${
-                  isSelected ? 'ring-2 ring-teal-600' : ''
-                } ${isToday ? 'font-bold' : ''} ${plan ? 'bg-teal-600 text-white' : s ? 'bg-slate-200' : 'hover:bg-slate-100'}`}
+                  isSelected ? 'ring-2 ring-[#731919]' : ''
+                } ${isToday ? 'font-bold' : ''} ${plan ? 'bg-[#731919] text-white' : s ? 'bg-slate-200' : 'hover:bg-slate-100'}`}
               >
                 <span>{day.getDate()}</span>
                 {plan && <span className="text-[9px] font-bold leading-none">{plan.name.slice(0, 6)}</span>}

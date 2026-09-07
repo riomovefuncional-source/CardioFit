@@ -36,7 +36,7 @@ export default function AlunoApp({ studentId }: { studentId: string }) {
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-3 text-sm font-medium border-b-2 ${
-              tab === t ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === t ? 'border-[#731919] text-[#731919]' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {t}
@@ -125,7 +125,7 @@ function CheckinTab({ studentId }: { studentId: string }) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-5 text-sm text-slate-600">
         Check-in enviado para o seu profissional.{' '}
-        <button className="text-teal-700 underline" onClick={() => setDone(false)}>
+        <button className="text-[#731919] underline" onClick={() => setDone(false)}>
           Enviar outro
         </button>
       </div>

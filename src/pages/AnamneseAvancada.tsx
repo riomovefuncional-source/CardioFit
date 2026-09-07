@@ -123,7 +123,7 @@ function CardiacoSection({ studentId, ownerId }: { studentId: string; ownerId: s
           ))}
         </div>
         {!showDiagForm ? (
-          <button type="button" onClick={() => setShowDiagForm(true)} className="text-xs text-teal-700 font-medium">
+          <button type="button" onClick={() => setShowDiagForm(true)} className="text-xs text-[#731919] font-medium">
             + Adicionar diagnóstico
           </button>
         ) : (
@@ -342,7 +342,7 @@ function OsteoarticularSection({ studentId, ownerId }: { studentId: string; owne
             </button>
           ))}
         </div>
-        <button onClick={saveHistoricoGeral} className="text-xs text-teal-700 font-medium">
+        <button onClick={saveHistoricoGeral} className="text-xs text-[#731919] font-medium">
           Salvar seleção de regiões
         </button>
       </Section>
@@ -362,7 +362,7 @@ function OsteoarticularSection({ studentId, ownerId }: { studentId: string; owne
           ))}
         </div>
         {!showPainForm ? (
-          <button type="button" onClick={() => setShowPainForm(true)} className="text-xs text-teal-700 font-medium">
+          <button type="button" onClick={() => setShowPainForm(true)} className="text-xs text-[#731919] font-medium">
             + Registrar dor
           </button>
         ) : (
@@ -480,14 +480,14 @@ function MedicamentosSection({ studentId, ownerId }: { studentId: string; ownerI
               </p>
               {m.purpose && <p className="text-xs text-slate-400">Indicação: {m.purpose}</p>}
             </div>
-            <button onClick={() => toggleActive(m)} className="text-xs text-teal-700 whitespace-nowrap">
+            <button onClick={() => toggleActive(m)} className="text-xs text-[#731919] whitespace-nowrap">
               {m.active ? 'Marcar inativo' : 'Reativar'}
             </button>
           </div>
         ))}
       </div>
       {!showForm ? (
-        <button type="button" onClick={() => setShowForm(true)} className="text-xs text-teal-700 font-medium">
+        <button type="button" onClick={() => setShowForm(true)} className="text-xs text-[#731919] font-medium">
           + Adicionar medicamento
         </button>
       ) : (

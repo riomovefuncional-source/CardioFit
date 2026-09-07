@@ -2,6 +2,10 @@
 
 :root {
   color-scheme: light;
+  --brand-red: #731919;
+  --brand-red-dark: #591313;
+  --brand-gold: #C89116;
+  --brand-gold-light: #e0b34a;
 }
 
 body {
@@ -17,9 +21,24 @@ body {
 
 @layer components {
   .input {
-    @apply rounded-lg border border-slate-300 px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-teal-500;
+    @apply rounded-lg border border-slate-300 px-3 py-2 text-sm w-full focus:outline-none focus:ring-2;
+    focus-ring-color: var(--brand-gold);
+  }
+  .input:focus {
+    box-shadow: 0 0 0 2px var(--brand-gold);
+    border-color: var(--brand-gold);
   }
   .btn-primary {
-    @apply rounded-lg bg-teal-600 text-white px-4 py-2 text-sm font-medium hover:bg-teal-700 disabled:opacity-50 w-fit;
+    @apply rounded-lg text-white px-4 py-2 text-sm font-medium disabled:opacity-50 w-fit transition-colors;
+    background: var(--brand-red);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--brand-red-dark);
+  }
+  .brand-gradient {
+    background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
+  }
+  .brand-accent-text {
+    color: var(--brand-gold);
   }
 }

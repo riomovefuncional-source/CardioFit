@@ -165,7 +165,7 @@ export function IpcTab({ studentId, ownerId }: { studentId: string; ownerId: str
               type="button"
               onClick={() => toggleSymptom(s.value)}
               className={`px-3 py-2 rounded-lg border text-xs text-left ${
-                form.symptoms.includes(s.value) ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600'
+                form.symptoms.includes(s.value) ? 'bg-[#731919] text-white border-[#731919]' : 'border-slate-300 text-slate-600'
               }`}
             >
               {s.label}
@@ -176,7 +176,7 @@ export function IpcTab({ studentId, ownerId }: { studentId: string; ownerId: str
       </div>
 
       {allFilled && (
-        <div className={`bg-white border-2 rounded-xl p-6 text-center space-y-2 ${suspended ? 'border-red-500' : 'border-teal-200'}`}>
+        <div className={`bg-white border-2 rounded-xl p-6 text-center space-y-2 ${suspended ? 'border-red-500' : 'border-[#C89116]/40'}`}>
           {suspended ? (
             <>
               <p className="text-xl font-bold text-red-600">⚠️ TREINO SUSPENSO</p>
@@ -223,7 +223,7 @@ export function IpcTab({ studentId, ownerId }: { studentId: string; ownerId: str
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white border border-slate-200 rounded-xl p-3 text-center">
             <p className="text-xs text-slate-500">Média</p>
-            <p className="text-lg font-bold text-teal-700">{avg}</p>
+            <p className="text-lg font-bold text-[#731919]">{avg}</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-3 text-center">
             <p className="text-xs text-slate-500">Maior</p>

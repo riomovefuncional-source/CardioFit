@@ -78,7 +78,7 @@ export default function StudentProfile() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px ${
-              tab === t ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === t ? 'border-[#731919] text-[#731919]' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {t}
@@ -241,7 +241,7 @@ function LinkAccountCard({ student }: { student: Student }) {
           </button>
         </form>
       )}
-      {message && <p className={`text-xs ${status === 'error' ? 'text-red-600' : 'text-teal-700'}`}>{message}</p>}
+      {message && <p className={`text-xs ${status === 'error' ? 'text-red-600' : 'text-[#731919]'}`}>{message}</p>}
     </div>
   )
 }
@@ -399,12 +399,12 @@ function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50 rounded-xl p-3 text-center">
               <p className="text-xs text-slate-500 uppercase tracking-wide">Gasto Energético Basal</p>
-              <p className="text-xl font-bold text-teal-700">{bmr ?? '—'}</p>
+              <p className="text-xl font-bold text-[#731919]">{bmr ?? '—'}</p>
               <p className="text-xs text-slate-400">kcal/dia (Harris-Benedict)</p>
             </div>
             <div className="bg-slate-50 rounded-xl p-3 text-center">
               <p className="text-xs text-slate-500 uppercase tracking-wide">VO2 Previsto</p>
-              <p className="text-xl font-bold text-teal-700">{predictedVo2 ?? '—'}</p>
+              <p className="text-xl font-bold text-[#731919]">{predictedVo2 ?? '—'}</p>
               <p className="text-xs text-slate-400">ml/kg/min</p>
             </div>
           </div>
@@ -513,7 +513,7 @@ function ScalePicker({ value, onChange, max = 5 }: { value: number | null; onCha
           key={n}
           onClick={() => onChange(n)}
           className={`h-9 flex-1 min-w-[44px] rounded-lg text-sm font-medium border ${
-            value === n ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            value === n ? 'bg-[#731919] text-white border-[#731919]' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
           }`}
         >
           {n}
@@ -546,7 +546,7 @@ function PseScale({ value, onChange }: { value: number; onChange: (v: number) =>
           key={n}
           onClick={() => onChange(n)}
           className={`flex flex-col items-center gap-0.5 rounded-lg py-2 border ${
-            value === n ? 'border-teal-600 bg-teal-50' : 'border-transparent hover:bg-slate-50'
+            value === n ? 'border-[#731919] bg-[#C89116]/10' : 'border-transparent hover:bg-slate-50'
           }`}
         >
           <span className="text-lg">{emoji}</span>
@@ -886,7 +886,7 @@ function SessaoForm({ studentId, ownerId }: { studentId: string; ownerId: string
         </Field>
       </div>
 
-      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      {savedMsg && <p className="text-sm text-[#731919]">{savedMsg}</p>}
       <button disabled={saving} className="btn-primary w-full">
         {saving ? 'Salvando...' : 'Registrar Sessão'}
       </button>
@@ -1039,7 +1039,7 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
         </Field>
       </div>
 
-      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      {savedMsg && <p className="text-sm text-[#731919]">{savedMsg}</p>}
       <button disabled={saving} className="btn-primary w-full">
         {saving ? 'Salvando...' : 'Salvar Check-in Pré-Treino'}
       </button>
@@ -1151,7 +1151,7 @@ function PosTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
               key={s}
               onClick={() => toggleSymptom(s)}
               className={`text-xs px-2 py-1 rounded-full border ${
-                form.symptoms.includes(s) ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600'
+                form.symptoms.includes(s) ? 'bg-[#731919] text-white border-[#731919]' : 'border-slate-300 text-slate-600'
               }`}
             >
               {s}
@@ -1165,7 +1165,7 @@ function PosTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
       <Field label="Observações">
         <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       </Field>
-      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      {savedMsg && <p className="text-sm text-[#731919]">{savedMsg}</p>}
       <button disabled={saving} className="btn-primary w-full">
         {saving ? 'Salvando...' : 'Salvar Pós-Treino'}
       </button>
@@ -1395,7 +1395,7 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
                 {p.status}
               </span>
               {p.status !== 'pago' && (
-                <button onClick={() => markPaid(p.id)} className="text-xs text-teal-700 hover:underline">
+                <button onClick={() => markPaid(p.id)} className="text-xs text-[#731919] hover:underline">
                   marcar pago
                 </button>
               )}
@@ -1443,7 +1443,7 @@ function AlertasTab({ studentId }: { studentId: string }) {
             <p className="text-xs text-slate-500">{new Date(a.created_at).toLocaleString('pt-BR')}</p>
           </div>
           {!a.resolved && (
-            <button onClick={() => resolve(a.id)} className="text-xs text-teal-700 hover:underline">
+            <button onClick={() => resolve(a.id)} className="text-xs text-[#731919] hover:underline">
               marcar resolvido
             </button>
           )}

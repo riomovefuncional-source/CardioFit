@@ -274,7 +274,7 @@ export function PeriodizacaoTab({ studentId }: { studentId: string }) {
             <button
               key={l}
               onClick={() => changeLevel(l)}
-              className={`text-sm capitalize rounded-lg border py-2 ${level === l ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={`text-sm capitalize rounded-lg border py-2 ${level === l ? 'border-[#731919] bg-[#C89116]/10 text-[#591313]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
               {l}
             </button>
@@ -293,7 +293,7 @@ export function PeriodizacaoTab({ studentId }: { studentId: string }) {
               key={m.id}
               onClick={() => setModel(m.id)}
               className={`text-left rounded-lg border p-3 text-sm ${
-                model === m.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 hover:bg-slate-50'
+                model === m.id ? 'border-[#731919] bg-[#C89116]/10' : 'border-slate-200 hover:bg-slate-50'
               }`}
             >
               {m.name}

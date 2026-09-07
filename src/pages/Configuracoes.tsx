@@ -209,7 +209,7 @@ export default function Configuracoes() {
               resetForm()
               setShowForm(true)
             }}
-            className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700"
+            className="rounded-lg bg-[#731919] px-3 py-2 text-sm font-medium text-white hover:bg-[#731919]"
           >
             + Nova regra
           </button>
@@ -300,7 +300,7 @@ export default function Configuracoes() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              className="rounded-lg bg-[#731919] px-4 py-2 text-sm font-medium text-white hover:bg-[#731919]"
             >
               {saving ? 'Salvando...' : 'Salvar regra'}
             </button>
@@ -363,14 +363,14 @@ export default function Configuracoes() {
                     <button
                       onClick={() => toggleActive(rule)}
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        rule.active ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'
+                        rule.active ? 'bg-[#C89116]/20 text-[#731919]' : 'bg-slate-100 text-slate-500'
                       }`}
                     >
                       {rule.active ? 'Ativa' : 'Inativa'}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => startEdit(rule)} className="text-xs font-medium text-teal-700 hover:underline">
+                    <button onClick={() => startEdit(rule)} className="text-xs font-medium text-[#731919] hover:underline">
                       Editar
                     </button>
                   </td>

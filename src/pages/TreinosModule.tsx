@@ -211,7 +211,7 @@ function PlanEditor({ plan, ownerId, onPlanChanged }: { plan: WorkoutPlan; owner
               </span>
             </div>
             <div className="flex gap-2 flex-wrap text-xs">
-              <button onClick={() => setEditingMeta(true)} className="text-teal-700 font-medium">
+              <button onClick={() => setEditingMeta(true)} className="text-[#731919] font-medium">
                 Editar
               </button>
               <button onClick={duplicate} className="text-slate-500">
