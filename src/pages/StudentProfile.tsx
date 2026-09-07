@@ -266,23 +266,94 @@ function AvaliacoesTab({ studentId, ownerId }: { studentId: string; ownerId: str
   )
 }
 
+// ---- Fórmulas portadas do app de referência (PhysicalAssessmentTab) ----
+function calcBMR(weight: number, height: number, age: number, sex: 'M' | 'F') {
+  if (!weight || !height || !age || !sex) return null
+  if (sex === 'M') return Math.round(88.36 + 13.4 * weight + 4.8 * height - 5.7 * age)
+  return Math.round(447.6 + 9.2 * weight + 3.1 * height - 4.3 * age)
+}
+function calcPredictedVO2(age: number, sex: 'M' | 'F') {
+  if (!age || !sex) return null
+  if (sex === 'M') return Math.round((57.8 - 0.445 * age) * 10) / 10
+  return Math.round((41.2 - 0.343 * age) * 10) / 10
+}
+function calcAge(birthDate: string | null) {
+  if (!birthDate) return null
+  const b = new Date(birthDate)
+  const n = new Date()
+  let age = n.getFullYear() - b.getFullYear()
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) age--
+  return age
+}
+function calcPollock3(sex: 'M' | 'F', age: number, sf: { chest: number; abdomen: number; thigh: number; triceps: number; suprailiac: number }) {
+  let sum: number, density: number
+  if (sex === 'M') {
+    sum = sf.chest + sf.abdomen + sf.thigh
+    density = 1.10938 - 0.0008267 * sum + 0.0000016 * sum * sum - 0.0002574 * age
+  } else {
+    sum = sf.triceps + sf.suprailiac + sf.thigh
+    density = 1.0994921 - 0.0009929 * sum + 0.0000023 * sum * sum - 0.0001392 * age
+  }
+  const fat = (4.95 / density - 4.5) * 100
+  return { sum: Math.round(sum * 10) / 10, density: Math.round(density * 10000) / 10000, fat: Math.round(fat * 10) / 10 }
+}
+function calcPollock7(
+  sex: 'M' | 'F',
+  age: number,
+  sf: { chest: number; axillar: number; triceps: number; subscapular: number; abdomen: number; suprailiac: number; thigh: number },
+) {
+  const sum = sf.chest + sf.axillar + sf.triceps + sf.subscapular + sf.abdomen + sf.suprailiac + sf.thigh
+  let density: number
+  if (sex === 'M') density = 1.112 - 0.00043499 * sum + 0.00000055 * sum * sum - 0.00028826 * age
+  else density = 1.097 - 0.00046971 * sum + 0.00000056 * sum * sum - 0.00012828 * age
+  const fat = (4.95 / density - 4.5) * 100
+  return { sum: Math.round(sum * 10) / 10, density: Math.round(density * 10000) / 10000, fat: Math.round(fat * 10) / 10 }
+}
+
+const emptySF3 = { chest: '', abdomen: '', thigh: '', triceps: '', suprailiac: '' }
+const emptySF7 = { chest: '', axillar: '', triceps: '', subscapular: '', abdomen: '', suprailiac: '', thigh: '' }
+
 function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
   const [items, setItems] = useState<Assessment[]>([])
-  const [form, setForm] = useState({ weight_kg: '', height_cm: '', body_fat_pct: '', notes: '' })
+  const [student, setStudent] = useState<Student | null>(null)
+  const [form, setForm] = useState({ weight_kg: '', height_cm: '', notes: '' })
+  const [sf3, setSf3] = useState(emptySF3)
+  const [sf7, setSf7] = useState(emptySF7)
+  const [protocol, setProtocol] = useState<'3' | '7'>('3')
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const { data } = await supabase
-      .from('assessments')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('assessment_date', { ascending: false })
-    setItems(data ?? [])
+    const { data } = await supabase.from('assessments').select('*').eq('student_id', studentId).order('assessment_date', { ascending: false })
+    setItems((data as Assessment[]) ?? [])
   }
-
   useEffect(() => {
     load()
+    supabase.from('students').select('*').eq('id', studentId).single().then(({ data }) => setStudent(data))
   }, [studentId])
+
+  const sex: 'M' | 'F' | null = student?.sex === 'M' || student?.sex === 'F' ? student.sex : null
+  const age = calcAge(student?.birth_date ?? null)
+  const weight = Number(form.weight_kg) || 0
+  const height = Number(form.height_cm) || 0
+
+  const bmr = sex && age ? calcBMR(weight, height, age, sex) : null
+  const predictedVo2 = sex && age ? calcPredictedVO2(age, sex) : null
+
+  const sf3nums = { chest: Number(sf3.chest) || 0, abdomen: Number(sf3.abdomen) || 0, thigh: Number(sf3.thigh) || 0, triceps: Number(sf3.triceps) || 0, suprailiac: Number(sf3.suprailiac) || 0 }
+  const sf7nums = {
+    chest: Number(sf7.chest) || 0,
+    axillar: Number(sf7.axillar) || 0,
+    triceps: Number(sf7.triceps) || 0,
+    subscapular: Number(sf7.subscapular) || 0,
+    abdomen: Number(sf7.abdomen) || 0,
+    suprailiac: Number(sf7.suprailiac) || 0,
+    thigh: Number(sf7.thigh) || 0,
+  }
+  const res3 = sex && age ? calcPollock3(sex, age, sf3nums) : null
+  const res7 = sex && age ? calcPollock7(sex, age, sf7nums) : null
+  const activeRes = protocol === '3' ? res3 : res7
+  const fatMass = activeRes && weight ? Math.round((activeRes.fat / 100) * weight * 10) / 10 : null
+  const leanMass = fatMass !== null && weight ? Math.round((weight - fatMass) * 10) / 10 : null
 
   const save = async (e: FormEvent) => {
     e.preventDefault()
@@ -290,35 +361,123 @@ function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId
     const { error } = await supabase.from('assessments').insert({
       student_id: studentId,
       owner_id: ownerId,
-      weight_kg: form.weight_kg ? Number(form.weight_kg) : null,
-      height_cm: form.height_cm ? Number(form.height_cm) : null,
-      body_fat_pct: form.body_fat_pct ? Number(form.body_fat_pct) : null,
+      weight_kg: weight || null,
+      height_cm: height || null,
+      body_fat_pct: activeRes?.fat ?? null,
+      lean_mass_kg: leanMass,
+      basal_energy_expenditure: bmr,
+      vo2_estimated: predictedVo2,
+      skinfolds: protocol === '3' ? sf3nums : sf7nums,
       notes: form.notes || null,
     })
     setSaving(false)
     if (!error) {
-      setForm({ weight_kg: '', height_cm: '', body_fat_pct: '', notes: '' })
+      setForm({ weight_kg: '', height_cm: '', notes: '' })
+      setSf3(emptySF3)
+      setSf7(emptySF7)
       load()
     }
   }
 
   return (
     <div className="space-y-6">
-      <form onSubmit={save} className="bg-white border border-slate-200 rounded-xl p-5 flex flex-wrap gap-3 items-end max-w-2xl">
-        <Field label="Peso (kg)">
-          <input className="input w-24" type="number" step="0.1" value={form.weight_kg} onChange={(e) => setForm({ ...form, weight_kg: e.target.value })} />
-        </Field>
-        <Field label="Altura (cm)">
-          <input className="input w-24" type="number" value={form.height_cm} onChange={(e) => setForm({ ...form, height_cm: e.target.value })} />
-        </Field>
-        <Field label="% Gordura">
-          <input className="input w-24" type="number" step="0.1" value={form.body_fat_pct} onChange={(e) => setForm({ ...form, body_fat_pct: e.target.value })} />
-        </Field>
+      {!sex && <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">Defina o sexo do aluno na aba Geral para calcular BMR, VO2 previsto e % de gordura automaticamente.</p>}
+      <form onSubmit={save} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <div className="flex flex-wrap gap-3">
+          <Field label="Peso (kg)">
+            <input className="input w-28" type="number" step="0.1" value={form.weight_kg} onChange={(e) => setForm({ ...form, weight_kg: e.target.value })} />
+          </Field>
+          <Field label="Altura (cm)">
+            <input className="input w-28" type="number" value={form.height_cm} onChange={(e) => setForm({ ...form, height_cm: e.target.value })} />
+          </Field>
+        </div>
+
+        {(bmr || predictedVo2) && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 rounded-xl p-3 text-center">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Gasto Energético Basal</p>
+              <p className="text-xl font-bold text-teal-700">{bmr ?? '—'}</p>
+              <p className="text-xs text-slate-400">kcal/dia (Harris-Benedict)</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-3 text-center">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">VO2 Previsto</p>
+              <p className="text-xl font-bold text-teal-700">{predictedVo2 ?? '—'}</p>
+              <p className="text-xs text-slate-400">ml/kg/min</p>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <div className="flex bg-slate-100 rounded-lg p-1 gap-1 max-w-xs mb-3">
+            {(['3', '7'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setProtocol(p)}
+                className={`flex-1 py-1.5 rounded-md text-sm font-medium ${protocol === p ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+              >
+                {p} Dobras Pollock
+              </button>
+            ))}
+          </div>
+          {protocol === '3' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {(sex === 'F'
+                ? [
+                    ['triceps', 'Tríceps'],
+                    ['suprailiac', 'Supra-ilíaca'],
+                    ['thigh', 'Coxa'],
+                  ]
+                : [
+                    ['chest', 'Peito'],
+                    ['abdomen', 'Abdômen'],
+                    ['thigh', 'Coxa'],
+                  ]
+              ).map(([k, l]) => (
+                <Field key={k} label={`${l} (mm)`}>
+                  <input className="input" type="number" step="0.1" value={(sf3 as any)[k]} onChange={(e) => setSf3({ ...sf3, [k]: e.target.value })} />
+                </Field>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                ['chest', 'Peito'],
+                ['axillar', 'Axilar'],
+                ['triceps', 'Tríceps'],
+                ['subscapular', 'Subescapular'],
+                ['abdomen', 'Abdômen'],
+                ['suprailiac', 'Supra-ilíaca'],
+                ['thigh', 'Coxa'],
+              ].map(([k, l]) => (
+                <Field key={k} label={`${l} (mm)`}>
+                  <input className="input" type="number" step="0.1" value={(sf7 as any)[k]} onChange={(e) => setSf7({ ...sf7, [k]: e.target.value })} />
+                </Field>
+              ))}
+            </div>
+          )}
+          {activeRes && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+              {[
+                ['Σ Dobras', `${activeRes.sum} mm`],
+                ['% Gordura', `${activeRes.fat}%`],
+                ['Massa Gorda', fatMass ? `${fatMass} kg` : '—'],
+                ['Massa Magra', leanMass ? `${leanMass} kg` : '—'],
+              ].map(([l, v]) => (
+                <div key={l} className="bg-slate-50 rounded-lg p-2 text-center">
+                  <p className="text-xs text-slate-400">{l}</p>
+                  <p className="font-bold text-sm">{v}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <Field label="Observações">
-          <input className="input w-48" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <input className="input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </Field>
         <button disabled={saving} className="btn-primary">
-          {saving ? 'Salvando...' : 'Registrar avaliação'}
+          {saving ? 'Salvando...' : 'Salvar avaliação'}
         </button>
       </form>
 
@@ -328,7 +487,7 @@ function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId
           <div key={a.id} className="p-4 text-sm flex justify-between">
             <span>{new Date(a.assessment_date).toLocaleDateString('pt-BR')}</span>
             <span className="text-slate-600">
-              {a.weight_kg ?? '-'}kg · {a.height_cm ?? '-'}cm · IMC {a.bmi ?? '-'} · {a.body_fat_pct ?? '-'}% gordura
+              {a.weight_kg ?? '-'}kg · {a.height_cm ?? '-'}cm · IMC {a.bmi ?? '-'} · {a.body_fat_pct ?? '-'}% gordura · {a.lean_mass_kg ?? '-'}kg magra
             </span>
           </div>
         ))}
@@ -367,9 +526,9 @@ const PSE_LABELS = [
   ['🙂', 'Leve'],
   ['😊', 'Moderado'],
   ['😐', 'Moderado+'],
-  ['😕', 'Forte'],
-  ['🙁', 'Forte+'],
-  ['😟', 'Muito forte'],
+  ['😤', 'Forte'],
+  ['😓', 'Forte+'],
+  ['😰', 'Muito forte'],
   ['😫', 'Muito forte+'],
   ['🥵', 'Extremo'],
   ['💀', 'Máximo'],
@@ -482,6 +641,31 @@ const emptySessao = {
   notes: '',
 }
 
+// ---- Classificação de PA portada do app de referência (BPAlert.jsx) ----
+function classifySystolic(v: number) {
+  if (!v) return null
+  if (v < 120) return { label: 'Normal', stage: 0 }
+  if (v <= 139) return { label: 'Pré-hipertensão', stage: 1 }
+  if (v <= 159) return { label: 'Estágio 1', stage: 2 }
+  if (v <= 179) return { label: 'Estágio 2', stage: 3 }
+  return { label: 'Estágio 3', stage: 4 }
+}
+function classifyDiastolic(v: number) {
+  if (!v) return null
+  if (v < 80) return { label: 'Normal', stage: 0 }
+  if (v <= 89) return { label: 'Pré-hipertensão', stage: 1 }
+  if (v <= 99) return { label: 'Estágio 1', stage: 2 }
+  if (v <= 109) return { label: 'Estágio 2', stage: 3 }
+  return { label: 'Estágio 3', stage: 4 }
+}
+function trainingClearance(maxStage: number) {
+  if (maxStage <= 0) return { text: 'Liberado para treino', tone: 'ok' as const }
+  if (maxStage === 1) return { text: 'Liberado com atenção — monitorar durante o treino', tone: 'amarelo' as const }
+  if (maxStage === 2) return { text: 'Liberado com restrição — reduzir intensidade, monitorar FC e sintomas', tone: 'amarelo' as const }
+  if (maxStage === 3) return { text: 'Não recomendado — aguardar normalização antes de iniciar', tone: 'vermelho' as const }
+  return { text: 'Contraindicado — não iniciar sessão', tone: 'vermelho' as const }
+}
+
 function SessaoForm({ studentId, ownerId }: { studentId: string; ownerId: string }) {
   const [plans, setPlans] = useState<WorkoutPlan[]>([])
   const [form, setForm] = useState(emptySessao)
@@ -525,6 +709,9 @@ function SessaoForm({ studentId, ownerId }: { studentId: string; ownerId: string
   const vo2i = mvo2(dpPre)
   const vo2f = mvo2(dpPost)
   const note = bpNote()
+  const sysClass = classifySystolic(Number(form.systolic_bp_pre))
+  const diaClass = classifyDiastolic(Number(form.diastolic_bp_pre))
+  const clearance = sysClass || diaClass ? trainingClearance(Math.max(sysClass?.stage ?? 0, diaClass?.stage ?? 0)) : null
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -600,6 +787,31 @@ function SessaoForm({ studentId, ownerId }: { studentId: string; ownerId: string
             <input className="input" type="number" value={form.diastolic_bp_pre} onChange={(e) => setForm({ ...form, diastolic_bp_pre: e.target.value })} />
           </Field>
         </div>
+        {(sysClass || diaClass) && (
+          <div className="grid sm:grid-cols-2 gap-2">
+            {sysClass && (
+              <div className="text-xs rounded-lg px-3 py-2 bg-slate-50">
+                <p className="font-semibold text-slate-700">Sistólica: {form.systolic_bp_pre} mmHg</p>
+                <p className="text-slate-500">{sysClass.label}</p>
+              </div>
+            )}
+            {diaClass && (
+              <div className="text-xs rounded-lg px-3 py-2 bg-slate-50">
+                <p className="font-semibold text-slate-700">Diastólica: {form.diastolic_bp_pre} mmHg</p>
+                <p className="text-slate-500">{diaClass.label}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {clearance && (
+          <p
+            className={`text-xs rounded-lg px-3 py-2 font-medium ${
+              clearance.tone === 'vermelho' ? 'bg-red-50 text-red-700' : clearance.tone === 'amarelo' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'
+            }`}
+          >
+            {clearance.text}
+          </p>
+        )}
         <p
           className={`text-xs rounded-lg px-3 py-2 ${
             note.tone === 'vermelho'

@@ -156,6 +156,9 @@ export type Assessment = {
   body_fat_pct: number | null
   lean_mass_kg: number | null
   vo2_estimated: number | null
+  skinfolds: Record<string, number> | null
+  circumferences: Record<string, number> | null
+  basal_energy_expenditure: number | null
   notes: string | null
 }
 
