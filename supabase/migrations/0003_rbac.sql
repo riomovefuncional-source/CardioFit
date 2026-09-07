@@ -37,8 +37,8 @@ begin
   ]
   loop
     execute format(
-      'drop policy if exists %L on public.%I;
-       create policy %L on public.%I for all
+      'drop policy if exists %I on public.%I;
+       create policy %I on public.%I for all
          using (owner_id = auth.uid() or public.is_admin())
          with check (owner_id = auth.uid() or public.is_admin());',
       t || ': owner crud', t, t || ': owner crud', t
@@ -62,7 +62,7 @@ begin
   ]
   loop
     execute format(
-      'create policy %L on public.%I for select using (
+      'create policy %I on public.%I for select using (
          exists (select 1 from public.students s where s.id = %I.student_id and s.user_id = auth.uid())
        );',
       t || ': self read', t, t
