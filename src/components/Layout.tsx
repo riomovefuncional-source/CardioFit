@@ -5,6 +5,7 @@ const nav = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/alunos', label: 'Alunos' },
   { to: '/financeiro', label: 'Financeiro' },
+  { to: '/configuracoes', label: 'Configurações' },
 ]
 
 export default function Layout() {

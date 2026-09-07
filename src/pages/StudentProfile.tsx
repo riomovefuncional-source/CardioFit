@@ -21,7 +21,7 @@ const TABS = [
   'Saúde',
   'Avaliações',
   'Treinos',
-  'Sessões',
+  'Sessão',
   'Evolução',
   'Financeiro',
   'Alertas',
@@ -78,11 +78,16 @@ export default function StudentProfile() {
         ))}
       </div>
 
-      {tab === 'Geral' && student && <GeralTab student={student} ownerId={session.user.id} onUpdate={setStudent} />}
+      {tab === 'Geral' && student && (
+        <div className="space-y-6">
+          <GeralTab student={student} ownerId={session.user.id} onUpdate={setStudent} />
+          <LinkAccountCard student={student} />
+        </div>
+      )}
       {tab === 'Saúde' && <SaudeTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Avaliações' && <AvaliacoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Treinos' && <TreinosTab studentId={id} ownerId={session.user.id} />}
-      {tab === 'Sessões' && <SessoesTab studentId={id} ownerId={session.user.id} />}
+      {tab === 'Sessão' && <SessoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Evolução' && <EvolutionChart studentId={id} />}
       {tab === 'Financeiro' && <FinanceiroTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Alertas' && <AlertasTab studentId={id} />}
@@ -179,6 +184,53 @@ function GeralTab({
         {saving ? 'Salvando...' : 'Salvar alterações'}
       </button>
     </form>
+  )
+}
+
+// ---------------- VÍNCULO DE CONTA (login do aluno) ----------------
+function LinkAccountCard({ student }: { student: Student }) {
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState<'idle' | 'saving' | 'error' | 'ok'>('idle')
+  const [message, setMessage] = useState('')
+
+  const link = async (e: FormEvent) => {
+    e.preventDefault()
+    setStatus('saving')
+    const { error } = await supabase.rpc('link_student_account', { p_student_id: student.id, p_email: email })
+    if (error) {
+      setStatus('error')
+      setMessage(error.message)
+    } else {
+      setStatus('ok')
+      setMessage('Conta vinculada. O aluno já pode entrar com esse e-mail e senha.')
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-5 max-w-lg space-y-3">
+      <p className="text-sm font-semibold text-slate-800">Acesso do aluno ao app</p>
+      <p className="text-xs text-slate-500">
+        {student.user_id
+          ? 'Este aluno já possui uma conta vinculada.'
+          : 'O aluno precisa primeiro criar a própria conta na tela de login (mesmo formulário do profissional). Depois, informe o e-mail usado por ele aqui para liberar o acesso.'}
+      </p>
+      {!student.user_id && (
+        <form onSubmit={link} className="flex gap-2">
+          <input
+            className="input flex-1"
+            type="email"
+            placeholder="email-do-aluno@exemplo.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <button disabled={status === 'saving'} className="btn-primary whitespace-nowrap">
+            {status === 'saving' ? 'Vinculando...' : 'Vincular'}
+          </button>
+        </form>
+      )}
+      {message && <p className={`text-xs ${status === 'error' ? 'text-red-600' : 'text-teal-700'}`}>{message}</p>}
+    </div>
   )
 }
 
@@ -424,16 +476,11 @@ function TreinosTab({ studentId, ownerId }: { studentId: string; ownerId: string
   )
 }
 
-// ---------------- SESSÕES (pré-treino → sessão → pós-treino) ----------------
-const PRE_SCALE_FIELDS = [
-  ['sleep_quality', 'Qualidade do sono'],
-  ['energy_level', 'Nível de energia'],
-  ['disposition', 'Disposição para treinar'],
-  ['stress_level', 'Estresse'],
-] as const
+// ---------------- SESSÃO (Sessão / Recuperação / IPC) ----------------
+const PAIN_REGIONS_SESSION = PAIN_REGIONS
 
 function ScalePicker({ value, onChange, max = 5 }: { value: number | null; onChange: (v: number) => void; max?: number }) {
-  const options = Array.from({ length: max + (max === 5 ? 0 : 1) }, (_, i) => (max === 5 ? i + 1 : i))
+  const options = Array.from({ length: max + 1 }, (_, i) => i).filter((n) => (max === 5 ? n >= 1 : true))
   return (
     <div className="flex flex-wrap gap-1">
       {options.map((n) => (
@@ -441,7 +488,7 @@ function ScalePicker({ value, onChange, max = 5 }: { value: number | null; onCha
           type="button"
           key={n}
           onClick={() => onChange(n)}
-          className={`h-7 w-7 rounded-md text-xs font-medium border ${
+          className={`h-9 flex-1 min-w-[44px] rounded-lg text-sm font-medium border ${
             value === n ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
           }`}
         >
@@ -452,44 +499,358 @@ function ScalePicker({ value, onChange, max = 5 }: { value: number | null; onCha
   )
 }
 
-function evaluateAlertsAgainst(
+const PSE_LABELS = [
+  ['😴', 'Repouso'],
+  ['😌', 'Muito leve'],
+  ['🙂', 'Leve'],
+  ['😊', 'Moderado'],
+  ['😐', 'Moderado+'],
+  ['😕', 'Forte'],
+  ['🙁', 'Forte+'],
+  ['😟', 'Muito forte'],
+  ['😫', 'Muito forte+'],
+  ['🥵', 'Extremo'],
+  ['💀', 'Máximo'],
+] as const
+
+function PseScale({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="grid grid-cols-11 gap-1 text-center">
+      {PSE_LABELS.map(([emoji, label], n) => (
+        <button
+          type="button"
+          key={n}
+          onClick={() => onChange(n)}
+          className={`flex flex-col items-center gap-0.5 rounded-lg py-2 border ${
+            value === n ? 'border-teal-600 bg-teal-50' : 'border-transparent hover:bg-slate-50'
+          }`}
+        >
+          <span className="text-lg">{emoji}</span>
+          <span className="text-[10px] font-semibold">{n}</span>
+          <span className="text-[9px] text-slate-500 leading-tight hidden sm:block">{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+async function evaluateAlertsAgainst(
   studentId: string,
   ownerId: string,
   sourceTable: string,
   sourceId: string,
   vitals: Record<string, number | null>,
 ) {
-  return supabase
-    .from('clinical_safety_rules')
-    .select('*')
-    .eq('active', true)
-    .then(async ({ data: rules }) => {
-      if (!rules) return
-      for (const rule of rules) {
-        const value = vitals[rule.field_name]
-        if (value === null || value === undefined) continue
-        const triggered =
-          (rule.operator === 'gt' && value > rule.threshold) ||
-          (rule.operator === 'gte' && value >= rule.threshold) ||
-          (rule.operator === 'lt' && value < rule.threshold) ||
-          (rule.operator === 'lte' && value <= rule.threshold) ||
-          (rule.operator === 'eq' && value === rule.threshold)
-        if (triggered) {
-          await supabase.from('alerts').insert({
-            student_id: studentId,
-            owner_id: ownerId,
-            source_table: sourceTable,
-            source_id: sourceId,
-            rule_id: rule.id,
-            level: rule.severity,
-            message: rule.message,
-          })
-        }
-      }
-    })
+  const { data: rules } = await supabase.from('clinical_safety_rules').select('*').eq('active', true)
+  if (!rules) return
+  for (const rule of rules) {
+    const value = vitals[rule.field_name]
+    if (value === null || value === undefined) continue
+    const triggered =
+      (rule.operator === 'gt' && value > rule.threshold) ||
+      (rule.operator === 'gte' && value >= rule.threshold) ||
+      (rule.operator === 'lt' && value < rule.threshold) ||
+      (rule.operator === 'lte' && value <= rule.threshold) ||
+      (rule.operator === 'eq' && value === rule.threshold)
+    if (triggered) {
+      await supabase.from('alerts').insert({
+        student_id: studentId,
+        owner_id: ownerId,
+        source_table: sourceTable,
+        source_id: sourceId,
+        rule_id: rule.id,
+        level: rule.severity,
+        message: rule.message,
+      })
+    }
+  }
 }
 
-const emptyPre = {
+// Duplo Produto = FC x PAS · MVO2 = (DP x 0,0014) - 6,3
+function doubleProduct(hr: string, sbp: string) {
+  if (!hr || !sbp) return null
+  return Number(hr) * Number(sbp)
+}
+function mvo2(dp: number | null) {
+  if (dp === null) return null
+  return Math.round((dp * 0.0014 - 6.3) * 10) / 10
+}
+
+const SESSAO_SUBTABS = ['Sessão', 'Recuperação', 'IPC'] as const
+type SessaoSubTab = (typeof SESSAO_SUBTABS)[number]
+
+function SessoesTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [sub, setSub] = useState<SessaoSubTab>('Sessão')
+  return (
+    <div className="space-y-4">
+      <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+        {SESSAO_SUBTABS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setSub(s)}
+            className={`flex-1 py-2 rounded-md text-sm font-medium ${
+              sub === s ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      {sub === 'Sessão' && <SessaoForm studentId={studentId} ownerId={ownerId} />}
+      {sub === 'Recuperação' && <RecuperacaoModule studentId={studentId} ownerId={ownerId} />}
+      {sub === 'IPC' && <IpcTab studentId={studentId} />}
+    </div>
+  )
+}
+
+// ---- Sub-aba "Sessão": registro completo pré/pós numa única tela ----
+const emptySessao = {
+  workout_plan_id: '',
+  session_date: new Date().toISOString().slice(0, 10),
+  systolic_bp_pre: '',
+  diastolic_bp_pre: '',
+  heart_rate_pre: '',
+  heart_rate_post: '',
+  heart_rate_max: '',
+  spo2_pre: '',
+  spo2_post: '',
+  duration_minutes: '',
+  rpe: 5,
+  feedback: '',
+  notes: '',
+}
+
+function SessaoForm({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [plans, setPlans] = useState<WorkoutPlan[]>([])
+  const [form, setForm] = useState(emptySessao)
+  const [rules, setRules] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
+
+  useEffect(() => {
+    supabase.from('workout_plans').select('*').eq('student_id', studentId).eq('active', true).then(({ data }) => setPlans(data ?? []))
+    supabase
+      .from('clinical_safety_rules')
+      .select('*')
+      .eq('active', true)
+      .in('field_name', ['systolic_bp', 'diastolic_bp'])
+      .then(({ data }) => setRules(data ?? []))
+  }, [studentId])
+
+  const bpNote = () => {
+    if (!form.systolic_bp_pre && !form.diastolic_bp_pre) {
+      return { text: 'Informe a pressão arterial acima para receber a classificação e orientação de segurança.', tone: 'neutral' as const }
+    }
+    const vitals = { systolic_bp: Number(form.systolic_bp_pre) || null, diastolic_bp: Number(form.diastolic_bp_pre) || null }
+    let worst: any = null
+    for (const r of rules) {
+      const v = vitals[r.field_name as 'systolic_bp' | 'diastolic_bp']
+      if (v === null) continue
+      const triggered =
+        (r.operator === 'gt' && v > r.threshold) ||
+        (r.operator === 'gte' && v >= r.threshold) ||
+        (r.operator === 'lt' && v < r.threshold) ||
+        (r.operator === 'lte' && v <= r.threshold) ||
+        (r.operator === 'eq' && v === r.threshold)
+      if (triggered && (!worst || (r.severity === 'vermelho' && worst.severity !== 'vermelho'))) worst = r
+    }
+    if (worst) return { text: worst.message, tone: worst.severity as 'amarelo' | 'vermelho' }
+    return { text: 'Dentro dos parâmetros configurados.', tone: 'ok' as const }
+  }
+
+  const dpPre = doubleProduct(form.heart_rate_pre, form.systolic_bp_pre)
+  const dpPost = doubleProduct(form.heart_rate_post, form.systolic_bp_pre)
+  const vo2i = mvo2(dpPre)
+  const vo2f = mvo2(dpPost)
+  const note = bpNote()
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    const vitalsPre = {
+      systolic_bp: form.systolic_bp_pre ? Number(form.systolic_bp_pre) : null,
+      diastolic_bp: form.diastolic_bp_pre ? Number(form.diastolic_bp_pre) : null,
+      heart_rate: form.heart_rate_pre ? Number(form.heart_rate_pre) : null,
+      spo2: form.spo2_pre ? Number(form.spo2_pre) : null,
+    }
+    const vitalsPost = {
+      heart_rate: form.heart_rate_post ? Number(form.heart_rate_post) : null,
+      spo2: form.spo2_post ? Number(form.spo2_post) : null,
+    }
+    const { data: row, error } = await supabase
+      .from('workout_sessions')
+      .insert({
+        student_id: studentId,
+        owner_id: ownerId,
+        workout_plan_id: form.workout_plan_id || null,
+        session_date: form.session_date,
+        heart_rate_pre: vitalsPre.heart_rate,
+        systolic_bp_pre: vitalsPre.systolic_bp,
+        diastolic_bp_pre: vitalsPre.diastolic_bp,
+        spo2_pre: vitalsPre.spo2,
+        heart_rate_post: vitalsPost.heart_rate,
+        spo2_post: vitalsPost.spo2,
+        heart_rate_max: form.heart_rate_max ? Number(form.heart_rate_max) : null,
+        vo2_initial: vo2i,
+        vo2_final: vo2f,
+        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
+        rpe: form.rpe,
+        feedback: form.feedback || null,
+        notes: form.notes || null,
+      })
+      .select()
+      .single()
+
+    if (!error && row) {
+      await evaluateAlertsAgainst(studentId, ownerId, 'workout_sessions', row.id, vitalsPre)
+      await evaluateAlertsAgainst(studentId, ownerId, 'workout_sessions', row.id, vitalsPost)
+      setSavedMsg('Sessão registrada.')
+      setForm(emptySessao)
+    }
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 grid sm:grid-cols-2 gap-4">
+        <Field label="Treino">
+          <select className="input" value={form.workout_plan_id} onChange={(e) => setForm({ ...form, workout_plan_id: e.target.value })}>
+            <option value="">Selecione o treino</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Data">
+          <input type="date" className="input" value={form.session_date} onChange={(e) => setForm({ ...form, session_date: e.target.value })} />
+        </Field>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-slate-800">Pressão Arterial Pré-Treino (mmHg)</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Sistólica (PAS)">
+            <input className="input" type="number" value={form.systolic_bp_pre} onChange={(e) => setForm({ ...form, systolic_bp_pre: e.target.value })} />
+          </Field>
+          <Field label="Diastólica (PAD)">
+            <input className="input" type="number" value={form.diastolic_bp_pre} onChange={(e) => setForm({ ...form, diastolic_bp_pre: e.target.value })} />
+          </Field>
+        </div>
+        <p
+          className={`text-xs rounded-lg px-3 py-2 ${
+            note.tone === 'vermelho'
+              ? 'bg-red-50 text-red-700'
+              : note.tone === 'amarelo'
+                ? 'bg-amber-50 text-amber-700'
+                : note.tone === 'ok'
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-slate-50 text-slate-500'
+          }`}
+        >
+          {note.text}
+        </p>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-slate-800">Frequência Cardíaca (bpm)</p>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <Field label="Pré-treino">
+            <input className="input" type="number" value={form.heart_rate_pre} onChange={(e) => setForm({ ...form, heart_rate_pre: e.target.value })} />
+          </Field>
+          <Field label="Pós-treino">
+            <input className="input" type="number" value={form.heart_rate_post} onChange={(e) => setForm({ ...form, heart_rate_post: e.target.value })} />
+          </Field>
+          <Field label="FC Máxima">
+            <input className="input" type="number" value={form.heart_rate_max} onChange={(e) => setForm({ ...form, heart_rate_max: e.target.value })} />
+          </Field>
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-slate-800">Saturação (SpO2) · Duplo Produto · MVO2</p>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <Field label="SpO2 Pré (%)">
+            <input className="input" type="number" value={form.spo2_pre} onChange={(e) => setForm({ ...form, spo2_pre: e.target.value })} />
+          </Field>
+          <Field label="SpO2 Pós (%)">
+            <input className="input" type="number" value={form.spo2_post} onChange={(e) => setForm({ ...form, spo2_post: e.target.value })} />
+          </Field>
+          <Field label="Duplo Produto Pré">
+            <input className="input bg-slate-50" disabled value={dpPre ?? 'auto'} />
+          </Field>
+          <Field label="Duplo Produto Pós">
+            <input className="input bg-slate-50" disabled value={dpPost ?? 'auto'} />
+          </Field>
+          <Field label="MVO2 Inicial (ml/min/kg)">
+            <input className="input bg-slate-50" disabled value={vo2i ?? 'auto'} />
+          </Field>
+          <Field label="MVO2 Final (ml/min/kg)">
+            <input className="input bg-slate-50" disabled value={vo2f ?? 'auto'} />
+          </Field>
+        </div>
+        <p className="text-[11px] text-slate-400">DP = FC × PAS · MVO2 = (DP × 0,0014) − 6,3 — calculados automaticamente.</p>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <Field label="Duração (minutos)">
+          <input className="input max-w-[160px]" type="number" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+        </Field>
+        <div>
+          <p className="text-sm text-slate-600 mb-2">PSE — Percepção Subjetiva de Esforço</p>
+          <PseScale value={form.rpe} onChange={(v) => setForm({ ...form, rpe: v })} />
+        </div>
+        <Field label="Feedback do Treino">
+          <textarea className="input" rows={2} placeholder="Como se sentiu? Dores, desconfortos, intercorrências..." value={form.feedback} onChange={(e) => setForm({ ...form, feedback: e.target.value })} />
+        </Field>
+        <Field label="Observações / Cargas">
+          <textarea className="input" rows={2} placeholder="Cargas utilizadas, ajustes, anotações para próxima sessão..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+      </div>
+
+      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      <button disabled={saving} className="btn-primary w-full">
+        {saving ? 'Salvando...' : 'Registrar Sessão'}
+      </button>
+    </form>
+  )
+}
+
+// ---- Sub-aba "Recuperação": Pré-Treino / Pós-Treino / Volume / Dashboard ----
+const RECUP_SUBTABS = ['Pré-Treino', 'Pós-Treino', 'Volume', 'Dashboard'] as const
+type RecupSubTab = (typeof RECUP_SUBTABS)[number]
+
+function RecuperacaoModule({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [sub, setSub] = useState<RecupSubTab>('Pré-Treino')
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <p className="text-sm font-semibold text-slate-800">Monitoramento de Recuperação e Controle de Carga</p>
+        <p className="text-xs text-slate-500">Check-in pré-treino, registro pós-treino, controle de volume e dashboard</p>
+      </div>
+      <div className="flex bg-slate-100 rounded-lg p-1 gap-1 flex-wrap">
+        {RECUP_SUBTABS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setSub(s)}
+            className={`flex-1 py-1.5 rounded-md text-xs sm:text-sm font-medium min-w-[80px] ${
+              sub === s ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      {sub === 'Pré-Treino' && <PreTreinoCheckin studentId={studentId} ownerId={ownerId} />}
+      {sub === 'Pós-Treino' && <PosTreinoCheckin studentId={studentId} ownerId={ownerId} />}
+      {sub === 'Volume' && <VolumeTab studentId={studentId} />}
+      {sub === 'Dashboard' && <RecuperacaoDashboard studentId={studentId} />}
+    </div>
+  )
+}
+
+const emptyPreCheckin = {
   sleep_hours: '',
   sleep_quality: null as number | null,
   energy_level: null as number | null,
@@ -497,184 +858,101 @@ const emptyPre = {
   stress_level: null as number | null,
   pain_level: '',
   pain_regions: [] as string[],
-  systolic_bp: '',
-  diastolic_bp: '',
-  heart_rate: '',
-  spo2: '',
-  vo2_initial: '',
 }
 
-const emptyPost = {
-  duration_minutes: '',
-  rpe: 5,
-  heart_rate_post: '',
-  heart_rate_max: '',
-  systolic_bp_post: '',
-  diastolic_bp_post: '',
-  spo2_post: '',
-  vo2_final: '',
-  recovery_perception: null as number | null,
-  feedback: '',
-  symptoms: [] as string[],
-  notes: '',
-}
+function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [form, setForm] = useState(emptyPreCheckin)
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
 
-function SessoesTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [pre, setPre] = useState(emptyPre)
-  const [savingPre, setSavingPre] = useState(false)
-  const [finalizingId, setFinalizingId] = useState<string | null>(null)
-  const [post, setPost] = useState(emptyPost)
-  const [savingPost, setSavingPost] = useState(false)
+  const toggleRegion = (r: string) =>
+    setForm((f) => ({ ...f, pain_regions: f.pain_regions.includes(r) ? f.pain_regions.filter((x) => x !== r) : [...f.pain_regions, r] }))
 
-  const load = async () => {
-    const { data } = await supabase
-      .from('workout_sessions')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('session_date', { ascending: false })
-    setSessions(data ?? [])
-  }
-
-  useEffect(() => {
-    load()
-  }, [studentId])
-
-  const togglePainRegion = (region: string) =>
-    setPre((p) => ({
-      ...p,
-      pain_regions: p.pain_regions.includes(region) ? p.pain_regions.filter((r) => r !== region) : [...p.pain_regions, region],
-    }))
-
-  const toggleSessionSymptom = (s: string) =>
-    setPost((p) => ({
-      ...p,
-      symptoms: p.symptoms.includes(s) ? p.symptoms.filter((x) => x !== s) : [...p.symptoms, s],
-    }))
-
-  const startSession = async (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
-    setSavingPre(true)
-
-    const vitals = {
-      systolic_bp: pre.systolic_bp ? Number(pre.systolic_bp) : null,
-      diastolic_bp: pre.diastolic_bp ? Number(pre.diastolic_bp) : null,
-      heart_rate: pre.heart_rate ? Number(pre.heart_rate) : null,
-      spo2: pre.spo2 ? Number(pre.spo2) : null,
-      sleep_quality: pre.sleep_quality,
-      energy_level: pre.energy_level,
-      pain_level: pre.pain_level ? Number(pre.pain_level) : null,
-      fatigue_level: null as number | null,
-    }
-
-    const { data: checkinRow, error } = await supabase
+    setSaving(true)
+    const vitals = { pain_level: form.pain_level ? Number(form.pain_level) : null }
+    const { data: row, error } = await supabase
       .from('recovery_checkins')
       .insert({
         student_id: studentId,
         owner_id: ownerId,
-        sleep_hours: pre.sleep_hours ? Number(pre.sleep_hours) : null,
-        disposition: pre.disposition,
-        stress_level: pre.stress_level,
-        pain_regions: pre.pain_regions,
-        vo2_initial: pre.vo2_initial ? Number(pre.vo2_initial) : null,
-        ...vitals,
+        sleep_hours: form.sleep_hours ? Number(form.sleep_hours) : null,
+        sleep_quality: form.sleep_quality,
+        energy_level: form.energy_level,
+        disposition: form.disposition,
+        stress_level: form.stress_level,
+        pain_level: vitals.pain_level,
+        pain_regions: form.pain_regions,
       })
       .select()
       .single()
-
-    if (!error && checkinRow) {
-      await evaluateAlertsAgainst(studentId, ownerId, 'recovery_checkins', checkinRow.id, vitals)
-
-      await supabase.from('workout_sessions').insert({
-        student_id: studentId,
-        owner_id: ownerId,
-        recovery_checkin_id: checkinRow.id,
-        heart_rate_pre: vitals.heart_rate,
-        systolic_bp_pre: vitals.systolic_bp,
-        diastolic_bp_pre: vitals.diastolic_bp,
-        spo2_pre: vitals.spo2,
-        vo2_initial: pre.vo2_initial ? Number(pre.vo2_initial) : null,
-      })
+    if (!error && row) {
+      await evaluateAlertsAgainst(studentId, ownerId, 'recovery_checkins', row.id, vitals)
+      setSavedMsg('Check-in pré-treino salvo.')
+      setForm(emptyPreCheckin)
     }
-
-    setSavingPre(false)
-    setPre(emptyPre)
-    load()
-  }
-
-  const openFinalize = (id: string) => {
-    setFinalizingId(id)
-    setPost(emptyPost)
-  }
-
-  const finalizeSession = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!finalizingId) return
-    setSavingPost(true)
-
-    const vitals = {
-      heart_rate: post.heart_rate_post ? Number(post.heart_rate_post) : null,
-      systolic_bp: post.systolic_bp_post ? Number(post.systolic_bp_post) : null,
-      diastolic_bp: post.diastolic_bp_post ? Number(post.diastolic_bp_post) : null,
-      spo2: post.spo2_post ? Number(post.spo2_post) : null,
-    }
-
-    const { error } = await supabase
-      .from('workout_sessions')
-      .update({
-        duration_minutes: post.duration_minutes ? Number(post.duration_minutes) : null,
-        rpe: post.rpe,
-        heart_rate_post: vitals.heart_rate,
-        heart_rate_max: post.heart_rate_max ? Number(post.heart_rate_max) : null,
-        systolic_bp_post: vitals.systolic_bp,
-        diastolic_bp_post: vitals.diastolic_bp,
-        spo2_post: vitals.spo2,
-        vo2_final: post.vo2_final ? Number(post.vo2_final) : null,
-        recovery_perception: post.recovery_perception,
-        feedback: post.feedback || null,
-        symptoms: post.symptoms,
-        notes: post.notes || null,
-      })
-      .eq('id', finalizingId)
-
-    if (!error) {
-      await evaluateAlertsAgainst(studentId, ownerId, 'workout_sessions', finalizingId, vitals)
-    }
-
-    setSavingPost(false)
-    setFinalizingId(null)
-    load()
+    setSaving(false)
   }
 
   return (
-    <div className="space-y-6">
-      {/* PRÉ-TREINO */}
-      <form onSubmit={startSession} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-        <p className="text-sm font-semibold text-slate-800">Monitoramento de Recuperação e Controle de Carga (pré-treino)</p>
+    <form onSubmit={submit} className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-slate-800">Sono</p>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Horas de sono">
-            <input className="input" type="number" step="0.5" value={pre.sleep_hours} onChange={(e) => setPre({ ...pre, sleep_hours: e.target.value })} />
+            <input className="input" type="number" step="0.5" placeholder="Ex: 7.5" value={form.sleep_hours} onChange={(e) => setForm({ ...form, sleep_hours: e.target.value })} />
           </Field>
-          <Field label="Intensidade da dor (0-10)">
-            <input className="input" type="number" min={0} max={10} value={pre.pain_level} onChange={(e) => setPre({ ...pre, pain_level: e.target.value })} />
+          <Field label="Qualidade do sono">
+            <select
+              className="input"
+              value={form.sleep_quality ?? ''}
+              onChange={(e) => setForm({ ...form, sleep_quality: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">Selecionar</option>
+              <option value="1">1 — muito ruim</option>
+              <option value="2">2 — ruim</option>
+              <option value="3">3 — razoável</option>
+              <option value="4">4 — boa</option>
+              <option value="5">5 — ótima</option>
+            </select>
           </Field>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {PRE_SCALE_FIELDS.map(([key, label]) => (
-            <Field key={key} label={`${label} (1-5)`}>
-              <ScalePicker value={(pre as any)[key]} onChange={(v) => setPre({ ...pre, [key]: v })} />
-            </Field>
-          ))}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <p className="text-sm font-semibold text-slate-800">Energia · Disposição · Estresse</p>
+        <div>
+          <p className="text-sm text-slate-700">Nível de Energia</p>
+          <p className="text-xs text-slate-400 mb-1">1 = exausto · 5 = muito energizado</p>
+          <ScalePicker value={form.energy_level} onChange={(v) => setForm({ ...form, energy_level: v })} />
         </div>
+        <div>
+          <p className="text-sm text-slate-700">Disposição para Treinar</p>
+          <p className="text-xs text-slate-400 mb-1">1 = sem vontade · 5 = muito motivado</p>
+          <ScalePicker value={form.disposition} onChange={(v) => setForm({ ...form, disposition: v })} />
+        </div>
+        <div>
+          <p className="text-sm text-slate-700">Estresse</p>
+          <p className="text-xs text-slate-400 mb-1">1 = relaxado · 5 = muito estressado</p>
+          <ScalePicker value={form.stress_level} onChange={(v) => setForm({ ...form, stress_level: v })} />
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-slate-800">Dor Articular</p>
+        <Field label="Intensidade da dor (0-10)">
+          <input className="input" type="number" min={0} max={10} placeholder="0 = sem dor" value={form.pain_level} onChange={(e) => setForm({ ...form, pain_level: e.target.value })} />
+        </Field>
         <Field label="Regiões com dor">
-          <div className="flex flex-wrap gap-2">
-            {PAIN_REGIONS.map((r) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {PAIN_REGIONS_SESSION.map((r) => (
               <button
                 type="button"
                 key={r}
-                onClick={() => togglePainRegion(r)}
-                className={`text-xs px-2 py-1 rounded-full border ${
-                  pre.pain_regions.includes(r) ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-300 text-slate-600'
+                onClick={() => toggleRegion(r)}
+                className={`text-xs px-2 py-2 rounded-lg border ${
+                  form.pain_regions.includes(r) ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-300 text-slate-600'
                 }`}
               >
                 {r}
@@ -682,149 +960,264 @@ function SessoesTab({ studentId, ownerId }: { studentId: string; ownerId: string
             ))}
           </div>
         </Field>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Field label="PA sistólica (pré)">
-            <input className="input" type="number" value={pre.systolic_bp} onChange={(e) => setPre({ ...pre, systolic_bp: e.target.value })} />
-          </Field>
-          <Field label="PA diastólica (pré)">
-            <input className="input" type="number" value={pre.diastolic_bp} onChange={(e) => setPre({ ...pre, diastolic_bp: e.target.value })} />
-          </Field>
-          <Field label="FC (pré)">
-            <input className="input" type="number" value={pre.heart_rate} onChange={(e) => setPre({ ...pre, heart_rate: e.target.value })} />
-          </Field>
-          <Field label="SpO2 (pré)">
-            <input className="input" type="number" value={pre.spo2} onChange={(e) => setPre({ ...pre, spo2: e.target.value })} />
-          </Field>
-          <Field label="Duplo Produto (pré)">
-            <input className="input bg-slate-50" disabled value={pre.heart_rate && pre.systolic_bp ? Number(pre.heart_rate) * Number(pre.systolic_bp) : ''} />
-          </Field>
-          <Field label="VO2 inicial">
-            <input className="input" type="number" step="0.1" value={pre.vo2_initial} onChange={(e) => setPre({ ...pre, vo2_initial: e.target.value })} />
-          </Field>
+      </div>
+
+      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      <button disabled={saving} className="btn-primary w-full">
+        {saving ? 'Salvando...' : 'Salvar Check-in Pré-Treino'}
+      </button>
+    </form>
+  )
+}
+
+function PosTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [openSession, setOpenSession] = useState<WorkoutSession | null>(null)
+  const [form, setForm] = useState({
+    post_heart_rate: '',
+    post_systolic_bp: '',
+    post_diastolic_bp: '',
+    post_spo2: '',
+    heart_rate_max: '',
+    rpe: 5,
+    recovery_perception: null as number | null,
+    symptoms: [] as string[],
+    feedback: '',
+    notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState('')
+
+  useEffect(() => {
+    supabase
+      .from('workout_sessions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('session_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setOpenSession(data))
+  }, [studentId, savedMsg])
+
+  const toggleSymptom = (s: string) =>
+    setForm((f) => ({ ...f, symptoms: f.symptoms.includes(s) ? f.symptoms.filter((x) => x !== s) : [...f.symptoms, s] }))
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!openSession) return
+    setSaving(true)
+    const vitals = {
+      heart_rate: form.post_heart_rate ? Number(form.post_heart_rate) : null,
+      systolic_bp: form.post_systolic_bp ? Number(form.post_systolic_bp) : null,
+      diastolic_bp: form.post_diastolic_bp ? Number(form.post_diastolic_bp) : null,
+      spo2: form.post_spo2 ? Number(form.post_spo2) : null,
+    }
+    const { error } = await supabase
+      .from('workout_sessions')
+      .update({
+        heart_rate_post: vitals.heart_rate,
+        systolic_bp_post: vitals.systolic_bp,
+        diastolic_bp_post: vitals.diastolic_bp,
+        spo2_post: vitals.spo2,
+        heart_rate_max: form.heart_rate_max ? Number(form.heart_rate_max) : null,
+        recovery_perception: form.recovery_perception,
+        rpe: form.rpe,
+        symptoms: form.symptoms,
+        feedback: form.feedback || openSession.feedback || null,
+        notes: [openSession.notes, form.notes].filter(Boolean).join(' — ') || null,
+      })
+      .eq('id', openSession.id)
+    if (!error) {
+      await evaluateAlertsAgainst(studentId, ownerId, 'workout_sessions', openSession.id, vitals)
+      setSavedMsg('Pós-treino registrado.')
+    }
+    setSaving(false)
+  }
+
+  if (!openSession) {
+    return <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl p-5">Nenhuma sessão registrada ainda para lançar o pós-treino.</p>
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+      <p className="text-sm font-semibold text-slate-800">
+        Pós-treino — sessão de {new Date(openSession.session_date).toLocaleDateString('pt-BR')}
+      </p>
+      <div className="grid sm:grid-cols-3 gap-4">
+        <Field label="FC pós">
+          <input className="input" type="number" value={form.post_heart_rate} onChange={(e) => setForm({ ...form, post_heart_rate: e.target.value })} />
+        </Field>
+        <Field label="FC máxima">
+          <input className="input" type="number" value={form.heart_rate_max} onChange={(e) => setForm({ ...form, heart_rate_max: e.target.value })} />
+        </Field>
+        <Field label="SpO2 pós">
+          <input className="input" type="number" value={form.post_spo2} onChange={(e) => setForm({ ...form, post_spo2: e.target.value })} />
+        </Field>
+        <Field label="PA sistólica pós">
+          <input className="input" type="number" value={form.post_systolic_bp} onChange={(e) => setForm({ ...form, post_systolic_bp: e.target.value })} />
+        </Field>
+        <Field label="PA diastólica pós">
+          <input className="input" type="number" value={form.post_diastolic_bp} onChange={(e) => setForm({ ...form, post_diastolic_bp: e.target.value })} />
+        </Field>
+        <Field label="Percepção de recuperação (1-5)">
+          <ScalePicker value={form.recovery_perception} onChange={(v) => setForm({ ...form, recovery_perception: v })} />
+        </Field>
+      </div>
+      <div>
+        <p className="text-sm text-slate-600 mb-2">PSE</p>
+        <PseScale value={form.rpe} onChange={(v) => setForm({ ...form, rpe: v })} />
+      </div>
+      <Field label="Sintomas / intercorrências">
+        <div className="flex flex-wrap gap-2">
+          {SYMPTOM_OPTIONS.map((s) => (
+            <button
+              type="button"
+              key={s}
+              onClick={() => toggleSymptom(s)}
+              className={`text-xs px-2 py-1 rounded-full border ${
+                form.symptoms.includes(s) ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
-        <button disabled={savingPre} className="btn-primary">
-          {savingPre ? 'Salvando...' : 'Iniciar sessão (registrar pré-treino)'}
-        </button>
-      </form>
+      </Field>
+      <Field label="Feedback">
+        <textarea className="input" rows={2} value={form.feedback} onChange={(e) => setForm({ ...form, feedback: e.target.value })} />
+      </Field>
+      <Field label="Observações">
+        <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      </Field>
+      {savedMsg && <p className="text-sm text-teal-700">{savedMsg}</p>}
+      <button disabled={saving} className="btn-primary w-full">
+        {saving ? 'Salvando...' : 'Salvar Pós-Treino'}
+      </button>
+    </form>
+  )
+}
 
-      {/* FINALIZAR SESSÃO (registro da sessão + pós-treino) */}
-      {finalizingId && (
-        <form onSubmit={finalizeSession} className="bg-white border border-teal-300 rounded-xl p-5 space-y-4">
-          <p className="text-sm font-semibold text-slate-800">Registro da sessão e monitoramento pós-treino</p>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Field label="Duração (min)">
-              <input className="input" type="number" value={post.duration_minutes} onChange={(e) => setPost({ ...post, duration_minutes: e.target.value })} />
-            </Field>
-            <Field label="FC máxima">
-              <input className="input" type="number" value={post.heart_rate_max} onChange={(e) => setPost({ ...post, heart_rate_max: e.target.value })} />
-            </Field>
-            <Field label="VO2 final">
-              <input className="input" type="number" step="0.1" value={post.vo2_final} onChange={(e) => setPost({ ...post, vo2_final: e.target.value })} />
-            </Field>
-          </div>
-          <Field label="PSE (0-10)">
-            <div className="flex flex-wrap gap-1">
-              {Array.from({ length: 11 }, (_, n) => n).map((n) => (
-                <button
-                  type="button"
-                  key={n}
-                  onClick={() => setPost({ ...post, rpe: n })}
-                  className={`h-8 w-8 rounded-md text-xs font-semibold border ${
-                    post.rpe === n
-                      ? n <= 3
-                        ? 'bg-green-600 text-white border-green-600'
-                        : n <= 6
-                          ? 'bg-amber-500 text-white border-amber-500'
-                          : 'bg-red-600 text-white border-red-600'
-                      : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Field label="PA sistólica (pós)">
-              <input className="input" type="number" value={post.systolic_bp_post} onChange={(e) => setPost({ ...post, systolic_bp_post: e.target.value })} />
-            </Field>
-            <Field label="PA diastólica (pós)">
-              <input className="input" type="number" value={post.diastolic_bp_post} onChange={(e) => setPost({ ...post, diastolic_bp_post: e.target.value })} />
-            </Field>
-            <Field label="FC (pós)">
-              <input className="input" type="number" value={post.heart_rate_post} onChange={(e) => setPost({ ...post, heart_rate_post: e.target.value })} />
-            </Field>
-            <Field label="SpO2 (pós)">
-              <input className="input" type="number" value={post.spo2_post} onChange={(e) => setPost({ ...post, spo2_post: e.target.value })} />
-            </Field>
-            <Field label="Duplo Produto (pós)">
-              <input
-                className="input bg-slate-50"
-                disabled
-                value={post.heart_rate_post && post.systolic_bp_post ? Number(post.heart_rate_post) * Number(post.systolic_bp_post) : ''}
-              />
-            </Field>
-            <Field label="Percepção de recuperação (1-5)">
-              <ScalePicker value={post.recovery_perception} onChange={(v) => setPost({ ...post, recovery_perception: v })} />
-            </Field>
-          </div>
-          <Field label="Sintomas / intercorrências">
-            <div className="flex flex-wrap gap-2">
-              {SYMPTOM_OPTIONS.map((s) => (
-                <button
-                  type="button"
-                  key={s}
-                  onClick={() => toggleSessionSymptom(s)}
-                  className={`text-xs px-2 py-1 rounded-full border ${
-                    post.symptoms.includes(s) ? 'bg-teal-600 text-white border-teal-600' : 'border-slate-300 text-slate-600'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Feedback do aluno">
-            <textarea className="input" rows={2} value={post.feedback} onChange={(e) => setPost({ ...post, feedback: e.target.value })} />
-          </Field>
-          <Field label="Observações / cargas">
-            <textarea className="input" rows={2} value={post.notes} onChange={(e) => setPost({ ...post, notes: e.target.value })} />
-          </Field>
-          <div className="flex gap-2">
-            <button disabled={savingPost} className="btn-primary">
-              {savingPost ? 'Salvando...' : 'Finalizar sessão'}
-            </button>
-            <button type="button" onClick={() => setFinalizingId(null)} className="text-sm text-slate-500 hover:underline">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
+function VolumeTab({ studentId }: { studentId: string }) {
+  const [sessions, setSessions] = useState<WorkoutSession[]>([])
+  useEffect(() => {
+    supabase
+      .from('workout_sessions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('session_date', { ascending: false })
+      .limit(10)
+      .then(({ data }) => setSessions(data ?? []))
+  }, [studentId])
 
-      {/* HISTÓRICO */}
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const weeklyLoad = sessions.filter((s) => new Date(s.session_date).getTime() >= weekAgo).reduce((acc, s) => acc + (s.session_load ?? 0), 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <p className="text-xs text-slate-500">Carga semanal (últimos 7 dias)</p>
+        <p className="text-2xl font-semibold text-slate-800">{weeklyLoad}</p>
+      </div>
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {sessions.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma sessão registrada.</p>}
-        {sessions.map((s) => {
-          const emAndamento = s.rpe === null
-          return (
-            <div key={s.id} className="p-4 text-sm flex items-center justify-between gap-3">
-              <div>
-                <span className="block">{new Date(s.session_date).toLocaleString('pt-BR')}</span>
-                <span className="text-slate-500 text-xs">
-                  {emAndamento
-                    ? `Pré-treino registrado — FC ${s.heart_rate_pre ?? '-'} · PA ${s.systolic_bp_pre ?? '-'}/${s.diastolic_bp_pre ?? '-'} · SpO2 ${s.spo2_pre ?? '-'}%`
-                    : `${s.duration_minutes ?? '-'}min · PSE ${s.rpe ?? '-'} · carga ${s.session_load ?? '-'} · DP pré/pós ${s.double_product_pre ?? '-'}/${s.double_product_post ?? '-'}`}
-                </span>
-              </div>
-              {emAndamento && (
-                <button onClick={() => openFinalize(s.id)} className="text-xs font-medium text-teal-700 hover:underline shrink-0">
-                  Finalizar sessão →
-                </button>
-              )}
-            </div>
-          )
-        })}
+        {sessions.map((s) => (
+          <div key={s.id} className="p-3 text-sm flex justify-between">
+            <span>{new Date(s.session_date).toLocaleDateString('pt-BR')}</span>
+            <span className="text-slate-500">
+              {s.duration_minutes ?? '-'}min · PSE {s.rpe ?? '-'} · carga {s.session_load ?? '-'}
+            </span>
+          </div>
+        ))}
       </div>
+    </div>
+  )
+}
+
+function RecuperacaoDashboard({ studentId }: { studentId: string }) {
+  const [checkins, setCheckins] = useState<RecoveryCheckin[]>([])
+  useEffect(() => {
+    supabase
+      .from('recovery_checkins')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('checkin_at', { ascending: false })
+      .limit(7)
+      .then(({ data }) => setCheckins((data as RecoveryCheckin[]) ?? []))
+  }, [studentId])
+
+  const avg = (key: keyof RecoveryCheckin) => {
+    const vals = checkins.map((c) => c[key]).filter((v): v is number => typeof v === 'number')
+    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : '-'
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p className="text-xs text-slate-500">Energia média</p>
+          <p className="text-xl font-semibold">{avg('energy_level')}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p className="text-xs text-slate-500">Sono médio</p>
+          <p className="text-xl font-semibold">{avg('sleep_quality')}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p className="text-xs text-slate-500">Dor média</p>
+          <p className="text-xl font-semibold">{avg('pain_level')}</p>
+        </div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+        {checkins.length === 0 && <p className="p-4 text-sm text-slate-500">Sem check-ins registrados ainda.</p>}
+        {checkins.map((c) => (
+          <div key={c.id} className="p-3 text-sm flex justify-between">
+            <span>{new Date(c.checkin_at).toLocaleDateString('pt-BR')}</span>
+            <span className="text-slate-500">
+              sono {c.sleep_quality ?? '-'} · energia {c.energy_level ?? '-'} · dor {c.pain_level ?? '-'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---- Sub-aba "IPC": Índice de Prontidão Cardiovascular (interno, apoio à decisão) ----
+function IpcTab({ studentId }: { studentId: string }) {
+  const [last, setLast] = useState<RecoveryCheckin | null>(null)
+  useEffect(() => {
+    supabase
+      .from('recovery_checkins')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('checkin_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setLast(data as RecoveryCheckin | null))
+  }, [studentId])
+
+  if (!last) {
+    return <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl p-5">Sem check-in de recuperação recente para calcular o índice.</p>
+  }
+
+  // Heurística interna simples e transparente — nunca um escore clínico validado.
+  let score = 50
+  if (last.sleep_quality) score += (last.sleep_quality - 3) * 8
+  if (last.energy_level) score += (last.energy_level - 3) * 8
+  if (last.disposition) score += (last.disposition - 3) * 6
+  if (last.stress_level) score -= (last.stress_level - 3) * 6
+  if (last.pain_level !== null && last.pain_level !== undefined) score -= last.pain_level * 3
+  if (last.spo2 !== null && last.spo2 !== undefined && last.spo2 < 95) score -= (95 - last.spo2) * 4
+  score = Math.max(0, Math.min(100, Math.round(score)))
+  const level = score >= 70 ? 'verde' : score >= 40 ? 'amarelo' : 'vermelho'
+  const color = level === 'verde' ? 'text-green-600' : level === 'amarelo' ? 'text-amber-600' : 'text-red-600'
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-6 text-center space-y-2">
+      <p className="text-xs text-slate-500">Índice interno de prontidão (apoio à decisão)</p>
+      <p className={`text-5xl font-bold ${color}`}>{score}</p>
+      <p className={`text-sm font-medium ${color}`}>{level.toUpperCase()}</p>
+      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+        Calculado a partir do último check-in de recuperação. Não é um escore clínico validado nem substitui avaliação médica ou decisão profissional.
+      </p>
     </div>
   )
 }

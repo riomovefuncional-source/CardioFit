@@ -12,6 +12,7 @@ export type Student = {
   notes: string | null
   status: 'ativo' | 'inativo' | 'pausado'
   entry_date: string
+  user_id: string | null
   created_at: string
   updated_at: string
 }
