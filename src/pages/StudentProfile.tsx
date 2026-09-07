@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import type {
   Student,
-  HealthHistory,
   Assessment,
   WorkoutPlan,
   WorkoutSession,
@@ -16,6 +15,7 @@ import type {
 import { PAIN_REGIONS } from '../types'
 import EvolutionChart from '../components/EvolutionChart'
 import { CardioTab, PeriodizacaoTab } from './CardioPeriodizacao'
+import { AnamneseTab, PresencaTab, TestesFuncionaisTab } from './AnamneseAvancada'
 
 const TABS = [
   'Geral',
@@ -25,6 +25,7 @@ const TABS = [
   'Sessão',
   'Cardio',
   'Periodização',
+  'Presença',
   'Evolução',
   'Financeiro',
   'Alertas',
@@ -87,12 +88,13 @@ export default function StudentProfile() {
           <LinkAccountCard student={student} />
         </div>
       )}
-      {tab === 'Saúde' && <SaudeTab studentId={id} ownerId={session.user.id} />}
+      {tab === 'Saúde' && <AnamneseTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Avaliações' && <AvaliacoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Treinos' && <TreinosTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Sessão' && <SessoesTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Cardio' && <CardioTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Periodização' && <PeriodizacaoTab studentId={id} />}
+      {tab === 'Presença' && <PresencaTab studentId={id} />}
       {tab === 'Evolução' && <EvolutionChart studentId={id} />}
       {tab === 'Financeiro' && <FinanceiroTab studentId={id} ownerId={session.user.id} />}
       {tab === 'Alertas' && <AlertasTab studentId={id} />}
@@ -239,111 +241,30 @@ function LinkAccountCard({ student }: { student: Student }) {
   )
 }
 
-// ---------------- SAÚDE (Anamnese) ----------------
-function SaudeTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
-  const [history, setHistory] = useState<HealthHistory | null>(null)
-  const [form, setForm] = useState<Partial<HealthHistory>>({ symptoms: [], risk_factors: [] })
-  const [saving, setSaving] = useState(false)
-
-  const load = async () => {
-    const { data } = await supabase
-      .from('health_history')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    setHistory(data)
-    if (data) setForm(data)
-  }
-
-  useEffect(() => {
-    load()
-  }, [studentId])
-
-  const toggleSymptom = (s: string) => {
-    const list = form.symptoms ?? []
-    setForm({ ...form, symptoms: list.includes(s) ? list.filter((x) => x !== s) : [...list, s] })
-  }
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    // Cada gravação cria uma nova versão da anamnese — histórico nunca é sobrescrito.
-    const { error } = await supabase.from('health_history').insert({
-      ...form,
-      student_id: studentId,
-      owner_id: ownerId,
-    })
-    setSaving(false)
-    if (!error) load()
-  }
-
+// ---------------- AVALIAÇÕES (Avaliação Física / Testes Funcionais) ----------------
+const AVAL_SUBTABS = ['Avaliação', 'Testes Funcionais'] as const
+function AvaliacoesTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+  const [sub, setSub] = useState<(typeof AVAL_SUBTABS)[number]>('Avaliação')
   return (
-    <div className="space-y-6">
-      <form onSubmit={save} className="bg-white border border-slate-200 rounded-xl p-5 space-y-4 max-w-lg">
-        <p className="text-xs text-slate-500">
-          Cada vez que você salva, uma nova versão da anamnese é registrada — o histórico anterior é preservado.
-        </p>
-        <Field label="Diagnóstico cardiovascular">
-          <input
-            className="input"
-            value={form.cardiovascular_diagnosis ?? ''}
-            onChange={(e) => setForm({ ...form, cardiovascular_diagnosis: e.target.value })}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            ['history_infarction', 'Histórico de infarto'],
-            ['heart_failure', 'Insuficiência cardíaca'],
-            ['hypertension', 'Hipertensão'],
-            ['arrhythmia', 'Arritmias'],
-            ['coronary_artery_disease', 'Doença arterial coronariana'],
-          ].map(([key, label]) => (
-            <label key={key} className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={Boolean((form as any)[key])}
-                onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <Field label="Sintomas">
-          <div className="flex flex-wrap gap-2">
-            {SYMPTOM_OPTIONS.map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => toggleSymptom(s)}
-                className={`text-xs px-2 py-1 rounded-full border ${
-                  form.symptoms?.includes(s)
-                    ? 'bg-teal-600 text-white border-teal-600'
-                    : 'border-slate-300 text-slate-600'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Histórico familiar">
-          <input className="input" value={form.family_history ?? ''} onChange={(e) => setForm({ ...form, family_history: e.target.value })} />
-        </Field>
-        <Field label="Cirurgias / limitações musculoesqueléticas">
-          <textarea className="input" rows={2} value={form.musculoskeletal_notes ?? ''} onChange={(e) => setForm({ ...form, musculoskeletal_notes: e.target.value })} />
-        </Field>
-        <button disabled={saving} className="btn-primary">
-          {saving ? 'Salvando...' : history ? 'Salvar nova versão' : 'Salvar anamnese'}
-        </button>
-      </form>
+    <div className="space-y-4">
+      <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+        {AVAL_SUBTABS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setSub(s)}
+            className={`flex-1 py-2 rounded-md text-sm font-medium ${sub === s ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      {sub === 'Avaliação' && <AvaliacaoFisicaTab studentId={studentId} ownerId={ownerId} />}
+      {sub === 'Testes Funcionais' && <TestesFuncionaisTab studentId={studentId} ownerId={ownerId} />}
     </div>
   )
 }
 
-// ---------------- AVALIAÇÕES ----------------
-function AvaliacoesTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+function AvaliacaoFisicaTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
   const [items, setItems] = useState<Assessment[]>([])
   const [form, setForm] = useState({ weight_kg: '', height_cm: '', body_fat_pct: '', notes: '' })
   const [saving, setSaving] = useState(false)

@@ -33,6 +33,100 @@ export type HealthHistory = {
   risk_factors: string[] | null
   musculoskeletal_notes: string | null
   medical_followup: string | null
+  affected_regions: string[] | null
+  surgeries_history: string | null
+  hospitalizations: string | null
+  prior_illnesses: string | null
+  respiratory_diseases: string | null
+  created_at: string
+}
+
+export type CardiacDiagnosis = {
+  id: string
+  student_id: string
+  diagnosis: string
+  diagnosis_date: string | null
+  history: string | null
+  severity: string | null
+  treatment: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type SymptomRecord = {
+  id: string
+  student_id: string
+  symptom: string
+  present: boolean
+  frequency: string | null
+  intensity: string | null
+  situation: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type PainRecord = {
+  id: string
+  student_id: string
+  location: string | null
+  side: string | null
+  intensity: number | null
+  pain_type: string | null
+  onset: string | null
+  duration: string | null
+  frequency: string | null
+  worsens_with: string | null
+  improves_with: string | null
+  pain_during_exercise: boolean | null
+  pain_after_exercise: boolean | null
+  notes: string | null
+  created_at: string
+}
+
+export type Habits = {
+  id: string
+  student_id: string
+  activity_level: string | null
+  weekly_frequency: string | null
+  activity_type: string | null
+  smoking: string | null
+  alcohol: string | null
+  sleep_quality: string | null
+  stress_level: string | null
+  diet: string | null
+  hydration: string | null
+  daily_routine: string | null
+  work: string | null
+  training_preference: string | null
+  preferred_environment: string | null
+  preferred_time: string | null
+  equipment_preference: string | null
+  effort_tolerance: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type Attendance = {
+  id: string
+  student_id: string
+  attendance_date: string
+  status: 'presente' | 'ausente' | 'cancelado' | 'reposicao'
+  workout_session_id: string | null
+  recorded_by: string
+  origin: 'profissional' | 'aluno'
+  notes: string | null
+  created_at: string
+}
+
+export type FunctionalTestResult = {
+  id: string
+  student_id: string
+  test_type: string
+  test_date: string
+  primary_result: number | null
+  primary_unit: string | null
+  parameters: Record<string, any>
+  notes: string | null
   created_at: string
 }
 
