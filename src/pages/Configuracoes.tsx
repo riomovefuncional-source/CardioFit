@@ -315,8 +315,8 @@ export default function Configuracoes() {
         </form>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="text-left px-4 py-2">Regra</th>

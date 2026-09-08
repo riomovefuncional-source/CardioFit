@@ -64,7 +64,7 @@ export default function AlertasGlobal() {
   }
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-4 sm:p-8 max-w-5xl">
       <h1 className="text-2xl font-bold text-slate-900">Alertas</h1>
       <p className="text-sm text-slate-500 mb-6">Central de alertas de todos os alunos, por categoria e prioridade.</p>
 

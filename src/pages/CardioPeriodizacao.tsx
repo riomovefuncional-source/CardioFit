@@ -317,7 +317,7 @@ export function PeriodizacaoTab({ studentId }: { studentId: string }) {
           </Field>
         </div>
         {oneRM && (
-          <div className="grid grid-cols-4 gap-2 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
             {[50, 60, 70, 80].map((pct) => (
               <div key={pct} className="text-center p-2 rounded-lg bg-slate-50">
                 <p className="text-xs text-slate-400">{pct}%</p>

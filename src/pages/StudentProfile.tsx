@@ -68,7 +68,7 @@ export default function StudentProfile() {
   if (!id || !session) return null
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-4 sm:p-8 max-w-4xl">
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">
         {student?.full_name ?? 'Carregando...'}
       </h1>

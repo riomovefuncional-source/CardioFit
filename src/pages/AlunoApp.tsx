@@ -19,7 +19,7 @@ export default function AlunoApp({ studentId }: { studentId: string }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div>
           <span className="font-semibold text-slate-900">CardioFit</span>
           <span className="text-slate-400 text-sm ml-2">Área do aluno</span>
@@ -31,12 +31,12 @@ export default function AlunoApp({ studentId }: { studentId: string }) {
           </button>
         </div>
       </header>
-      <nav className="bg-white border-b border-slate-200 px-6 flex gap-1">
+      <nav className="bg-white border-b border-slate-200 px-3 sm:px-6 flex gap-1 overflow-x-auto">
         {ALUNO_TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-3 py-3 text-sm font-medium border-b-2 ${
+            className={`px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap shrink-0 ${
               tab === t ? 'border-[#731919] text-[#731919]' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -44,7 +44,7 @@ export default function AlunoApp({ studentId }: { studentId: string }) {
           </button>
         ))}
       </nav>
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="p-4 sm:p-6 max-w-3xl mx-auto">
         {tab === 'Meus Treinos' && <MeusTreinos studentId={studentId} />}
         {tab === 'Agenda' && student && <CalendarioTab studentId={studentId} ownerId={student.owner_id} readOnly />}
         {tab === 'Check-in' && <CheckinTab studentId={studentId} />}

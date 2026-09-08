@@ -194,7 +194,7 @@ export function IpcTab({ studentId, ownerId }: { studentId: string; ownerId: str
               <div className="relative h-3 rounded-full bg-gradient-to-r from-red-500 via-amber-400 to-emerald-500 overflow-hidden mt-3">
                 <div className="absolute top-0 h-full w-0.5 bg-slate-900" style={{ left: `${ipcScore}%` }} />
               </div>
-              <div className="grid grid-cols-5 gap-2 mt-3 text-xs">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-3 text-xs">
                 {[
                   ['PA', paScore, 25],
                   ['FC', fcScore, 20],

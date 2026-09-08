@@ -9,7 +9,11 @@
       <stop offset="100%" stop-color="#e0b34a"/>
     </linearGradient>
   </defs>
+
+  <!-- fundo -->
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- coração -->
   <path d="M256 392
            C 154 322, 92 262, 92 190
            C 92 140, 130 104, 178 104
@@ -17,7 +21,17 @@
            C 274 122, 302 104, 334 104
            C 382 104, 420 140, 420 190
            C 420 262, 358 322, 256 392 Z"
-        fill="none" stroke="#ffffff" stroke-width="20" stroke-linejoin="round"/>
+        fill="#ffffff" opacity="0.14"/>
+  <path d="M256 392
+           C 154 322, 92 262, 92 190
+           C 92 140, 130 104, 178 104
+           C 210 104, 238 122, 256 150
+           C 274 122, 302 104, 334 104
+           C 382 104, 420 140, 420 190
+           C 420 262, 358 322, 256 392 Z"
+        fill="none" stroke="#ffffff" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- linha de pulso (ECG) -->
   <path d="M118 246 H176 L200 190 L232 296 L266 158 L292 246 H394"
-        fill="none" stroke="url(#gold)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+        fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

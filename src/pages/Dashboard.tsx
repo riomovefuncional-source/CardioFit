@@ -400,7 +400,7 @@ export default function Dashboard() {
   const filteredHighlight = highlight.filter((h) => h.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-4 sm:p-8 max-w-6xl">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Olá{session?.user.email ? `, ${session.user.email.split('@')[0]}` : ''}</h1>

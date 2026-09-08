@@ -14,7 +14,7 @@ export default function Gestao() {
   const [tab, setTab] = useState<SubTab>(visibleTabs[0])
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-4 sm:p-8 max-w-5xl">
       <h1 className="text-2xl font-bold text-slate-900">Gestão</h1>
       <p className="text-sm text-slate-500 mb-6">
         {isAdmin ? 'Professores, biblioteca de exercícios, permissões, regras clínicas e auditoria.' : 'Biblioteca de exercícios e regras clínicas dos seus alunos.'}
