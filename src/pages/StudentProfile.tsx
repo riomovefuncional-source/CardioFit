@@ -91,7 +91,7 @@ export default function StudentProfile() {
       {tab === 'Geral' && student && (
         <div className="space-y-6">
           <GeralTab student={student} ownerId={session.user.id} onUpdate={setStudent} />
-          <LinkAccountCard student={student} />
+          <LinkAccountCard student={student} onUpdate={setStudent} />
         </div>
       )}
       {tab === 'Saúde' && <AnamneseTab studentId={id} ownerId={session.user.id} />}
@@ -202,7 +202,7 @@ function GeralTab({
 }
 
 // ---------------- VÍNCULO DE CONTA (login do aluno) ----------------
-function LinkAccountCard({ student }: { student: Student }) {
+function LinkAccountCard({ student, onUpdate }: { student: Student; onUpdate: (s: Student) => void }) {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'error' | 'ok'>('idle')
   const [message, setMessage] = useState('')
@@ -217,7 +217,14 @@ function LinkAccountCard({ student }: { student: Student }) {
     } else {
       setStatus('ok')
       setMessage('Conta vinculada. O aluno já pode entrar com esse e-mail e senha.')
+      onUpdate({ ...student, user_id: 'linked' })
     }
+  }
+
+  const unlink = async () => {
+    if (!confirm('Desvincular esta conta do aluno?')) return
+    const { error } = await supabase.rpc('unlink_student_account', { p_student_id: student.id })
+    if (!error) onUpdate({ ...student, user_id: null })
   }
 
   return (
@@ -228,6 +235,11 @@ function LinkAccountCard({ student }: { student: Student }) {
           ? 'Este aluno já possui uma conta vinculada.'
           : 'O aluno precisa primeiro criar a própria conta na tela de login (mesmo formulário do profissional). Depois, informe o e-mail usado por ele aqui para liberar o acesso.'}
       </p>
+      {student.user_id && (
+        <button onClick={unlink} className="text-xs text-red-600 font-medium">
+          Desvincular conta
+        </button>
+      )}
       {!student.user_id && (
         <form onSubmit={link} className="flex gap-2">
           <input
@@ -946,6 +958,20 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
   const [form, setForm] = useState(emptyPreCheckin)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
+  const [history, setHistory] = useState<any[]>([])
+
+  const loadHistory = () =>
+    supabase
+      .from('recovery_checkins')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('checkin_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => setHistory(data ?? []))
+
+  useEffect(() => {
+    loadHistory()
+  }, [studentId])
 
   const toggleRegion = (r: string) =>
     setForm((f) => ({ ...f, pain_regions: f.pain_regions.includes(r) ? f.pain_regions.filter((x) => x !== r) : [...f.pain_regions, r] }))
@@ -966,6 +992,7 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
         stress_level: form.stress_level,
         pain_level: vitals.pain_level,
         pain_regions: form.pain_regions,
+        origin: 'profissional',
       })
       .select()
       .single()
@@ -973,11 +1000,13 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
       await evaluateAlertsAgainst(studentId, ownerId, 'recovery_checkins', row.id, vitals)
       setSavedMsg('Check-in pré-treino salvo.')
       setForm(emptyPreCheckin)
+      loadHistory()
     }
     setSaving(false)
   }
 
   return (
+    <>
     <form onSubmit={submit} className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
         <p className="text-sm font-semibold text-slate-800">Sono</p>
@@ -1049,6 +1078,27 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
         {saving ? 'Salvando...' : 'Salvar Check-in Pré-Treino'}
       </button>
     </form>
+
+    <div className="bg-white border border-slate-200 rounded-xl p-4 mt-4">
+      <p className="text-sm font-semibold text-slate-800 mb-2">Check-ins recentes</p>
+      <div className="divide-y divide-slate-100">
+        {history.length === 0 && <p className="text-sm text-slate-500 py-2">Nenhum check-in registrado ainda.</p>}
+        {history.map((h) => (
+          <div key={h.id} className="py-2 text-sm flex flex-wrap justify-between gap-2">
+            <span className="text-slate-500">{new Date(h.checkin_at).toLocaleString('pt-BR')}</span>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${h.origin === 'aluno' ? 'bg-[#C89116]/10 text-[#731919]' : 'bg-slate-100 text-slate-600'}`}
+            >
+              {h.origin === 'aluno' ? 'enviado pelo aluno' : 'registrado pelo profissional'}
+            </span>
+            <span className="text-slate-500 text-xs">
+              sono {h.sleep_quality ?? '-'} · energia {h.energy_level ?? '-'} · dor {h.pain_level ?? '-'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+    </>
   )
 }
 

@@ -8,7 +8,7 @@ function fmtDate(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
-export function CalendarioTab({ studentId, ownerId }: { studentId: string; ownerId: string }) {
+export function CalendarioTab({ studentId, ownerId, readOnly = false }: { studentId: string; ownerId: string; readOnly?: boolean }) {
   const [month, setMonth] = useState(() => {
     const n = new Date()
     return new Date(n.getFullYear(), n.getMonth(), 1)
@@ -112,7 +112,7 @@ export function CalendarioTab({ studentId, ownerId }: { studentId: string; owner
             return (
               <button
                 key={day.toISOString()}
-                onClick={() => setSelectedDay(isSelected ? null : day)}
+                onClick={() => !readOnly && setSelectedDay(isSelected ? null : day)}
                 className={`relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs ${
                   isSelected ? 'ring-2 ring-[#731919]' : ''
                 } ${isToday ? 'font-bold' : ''} ${plan ? 'bg-[#731919] text-white' : s ? 'bg-slate-200' : 'hover:bg-slate-100'}`}

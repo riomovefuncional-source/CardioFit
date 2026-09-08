@@ -5,14 +5,17 @@ import { useAuth } from '../hooks/useAuth'
 import type { Student } from '../types'
 
 export default function Students() {
-  const { session } = useAuth()
+  const { session, role } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [students, setStudents] = useState<Student[]>([])
+  const [students, setStudents] = useState<(Student & { owner_id: string })[]>([])
+  const [professionals, setProfessionals] = useState<{ id: string; full_name: string }[]>([])
+  const [ownerFilter, setOwnerFilter] = useState('todos')
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(searchParams.get('new') === '1')
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const isAdmin = role === 'admin'
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -29,13 +32,17 @@ export default function Students() {
       .from('students')
       .select('*')
       .order('full_name', { ascending: true })
-    setStudents(data ?? [])
+    setStudents((data as any) ?? [])
     setLoading(false)
   }
 
   useEffect(() => {
     load()
-  }, [])
+    if (isAdmin) {
+      supabase.rpc('list_professionals').then(({ data }) => setProfessionals(((data as any[]) ?? []).map((p) => ({ id: p.id, full_name: p.full_name }))))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -52,8 +59,8 @@ export default function Students() {
     }
   }
 
-  const filtered = students.filter((s) =>
-    s.full_name.toLowerCase().includes(search.toLowerCase())
+  const filtered = students.filter(
+    (s) => s.full_name.toLowerCase().includes(search.toLowerCase()) && (ownerFilter === 'todos' || s.owner_id === ownerFilter),
   )
 
   return (
@@ -95,6 +102,20 @@ export default function Students() {
         onChange={(e) => setSearch(e.target.value)}
         className="w-full mb-4 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C89116]/100"
       />
+
+      {isAdmin && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs text-slate-500">Visão:</span>
+          <select className="input max-w-[220px]" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
+            <option value="todos">Todos os alunos</option>
+            {professionals.map((p) => (
+              <option key={p.id} value={p.id}>
+                Somente de {p.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-slate-500 text-sm">Carregando...</p>

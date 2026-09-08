@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import EvolutionChart from '../components/EvolutionChart'
+import { CalendarioTab } from './CalendarioModule'
 import type { Student, WorkoutPlan, WorkoutExercise, WorkoutSession } from '../types'
 
-const ALUNO_TABS = ['Meus Treinos', 'Check-in', 'Histórico', 'Evolução'] as const
+const ALUNO_TABS = ['Meus Treinos', 'Agenda', 'Check-in', 'Histórico', 'Evolução'] as const
 type AlunoTab = (typeof ALUNO_TABS)[number]
 
 export default function AlunoApp({ studentId }: { studentId: string }) {
@@ -45,6 +46,7 @@ export default function AlunoApp({ studentId }: { studentId: string }) {
       </nav>
       <main className="p-6 max-w-3xl mx-auto">
         {tab === 'Meus Treinos' && <MeusTreinos studentId={studentId} />}
+        {tab === 'Agenda' && student && <CalendarioTab studentId={studentId} ownerId={student.owner_id} readOnly />}
         {tab === 'Check-in' && <CheckinTab studentId={studentId} />}
         {tab === 'Histórico' && <HistoricoTab studentId={studentId} />}
         {tab === 'Evolução' && <EvolutionChart studentId={studentId} />}
@@ -116,6 +118,7 @@ function CheckinTab({ studentId }: { studentId: string }) {
       diastolic_bp: form.diastolic_bp ? Number(form.diastolic_bp) : null,
       heart_rate: form.heart_rate ? Number(form.heart_rate) : null,
       spo2: form.spo2 ? Number(form.spo2) : null,
+      origin: 'aluno',
     })
     setSaving(false)
     setDone(true)

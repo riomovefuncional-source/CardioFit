@@ -3,18 +3,25 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import Configuracoes from './Configuracoes'
 
-const SUBTABS = ['Professores', 'Exercícios', 'Permissões', 'Regras', 'Auditoria'] as const
-type SubTab = (typeof SUBTABS)[number]
+const ADMIN_ONLY_TABS = ['Professores', 'Permissões', 'Auditoria'] as const
+const ALL_TABS = ['Professores', 'Exercícios', 'Permissões', 'Regras', 'Auditoria'] as const
+type SubTab = (typeof ALL_TABS)[number]
 
 export default function Gestao() {
-  const [tab, setTab] = useState<SubTab>('Professores')
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
+  const visibleTabs = isAdmin ? ALL_TABS : ALL_TABS.filter((t) => !(ADMIN_ONLY_TABS as readonly string[]).includes(t))
+  const [tab, setTab] = useState<SubTab>(visibleTabs[0])
+
   return (
     <div className="p-8 max-w-5xl">
       <h1 className="text-2xl font-bold text-slate-900">Gestão</h1>
-      <p className="text-sm text-slate-500 mb-6">Professores, biblioteca de exercícios, permissões, regras clínicas e auditoria.</p>
+      <p className="text-sm text-slate-500 mb-6">
+        {isAdmin ? 'Professores, biblioteca de exercícios, permissões, regras clínicas e auditoria.' : 'Biblioteca de exercícios e regras clínicas dos seus alunos.'}
+      </p>
 
       <div className="flex bg-slate-100 rounded-lg p-1 gap-1 flex-wrap mb-6 max-w-xl">
-        {SUBTABS.map((s) => (
+        {visibleTabs.map((s) => (
           <button
             key={s}
             onClick={() => setTab(s)}
@@ -25,11 +32,11 @@ export default function Gestao() {
         ))}
       </div>
 
-      {tab === 'Professores' && <ProfessoresTab />}
+      {tab === 'Professores' && isAdmin && <ProfessoresTab />}
       {tab === 'Exercícios' && <ExerciciosTab />}
-      {tab === 'Permissões' && <PermissoesTab />}
+      {tab === 'Permissões' && isAdmin && <PermissoesTab />}
       {tab === 'Regras' && <Configuracoes />}
-      {tab === 'Auditoria' && <AuditoriaTab />}
+      {tab === 'Auditoria' && isAdmin && <AuditoriaTab />}
     </div>
   )
 }
@@ -44,16 +51,28 @@ type Professional = {
   last_activity: string | null
 }
 
+type AccountRow = {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  active: boolean
+  linked_student_id: string | null
+  linked_student_name: string | null
+}
+
 function ProfessoresTab() {
   const [rows, setRows] = useState<Professional[]>([])
+  const [linkedAccounts, setLinkedAccounts] = useState<AccountRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = () => {
     setLoading(true)
-    supabase.rpc('list_professionals').then(({ data, error }) => {
-      if (error) setError(error.message)
-      else setRows((data as Professional[]) ?? [])
+    Promise.all([supabase.rpc('list_professionals'), supabase.rpc('list_all_accounts')]).then(([profRes, allRes]) => {
+      if (profRes.error) setError(profRes.error.message)
+      else setRows((profRes.data as Professional[]) ?? [])
+      setLinkedAccounts(((allRes.data as AccountRow[]) ?? []).filter((a) => a.linked_student_id))
       setLoading(false)
     })
   }
@@ -66,6 +85,19 @@ function ProfessoresTab() {
     if (!error) load()
   }
 
+  const toggleRole = async (p: Professional) => {
+    const nextRole = p.role === 'admin' ? 'professional' : 'admin'
+    if (!confirm(`Tornar ${p.full_name} ${nextRole === 'admin' ? 'administrador' : 'professor'}?`)) return
+    const { error } = await supabase.rpc('set_professional_role', { p_user_id: p.id, p_role: nextRole })
+    if (!error) load()
+  }
+
+  const unlink = async (studentId: string) => {
+    if (!confirm('Desvincular esta conta do aluno? Ela deixará de conseguir entrar como aluno até ser vinculada de novo.')) return
+    await supabase.rpc('unlink_student_account', { p_student_id: studentId })
+    load()
+  }
+
   if (error) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
@@ -75,31 +107,57 @@ function ProfessoresTab() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-        Novo professor precisa criar a própria conta na tela de login — não é possível criar login por aqui sem uma chave administrativa do Supabase. Depois de criada a conta, ela aparece automaticamente nesta lista.
-      </div>
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {loading && <p className="p-4 text-sm text-slate-500">Carregando...</p>}
-        {!loading && rows.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhum professor encontrado.</p>}
-        {rows.map((p) => (
-          <div key={p.id} className="p-3 text-sm flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="font-medium">
-                {p.full_name} <span className="text-xs text-slate-400">({p.role})</span>
-              </p>
-              <p className="text-xs text-slate-500">{p.email}</p>
+    <div className="space-y-6">
+      <div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 mb-3">
+          Novo professor precisa criar a própria conta na tela de login — não é possível criar login por aqui sem uma chave administrativa do Supabase. Depois de criada a conta, ela aparece automaticamente nesta lista (a não ser que já esteja vinculada a um aluno).
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {loading && <p className="p-4 text-sm text-slate-500">Carregando...</p>}
+          {!loading && rows.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhum professor encontrado.</p>}
+          {rows.map((p) => (
+            <div key={p.id} className="p-3 text-sm flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="font-medium">
+                  {p.full_name} <span className="text-xs text-slate-400">({p.role === 'admin' ? 'admin' : 'professor'})</span>
+                </p>
+                <p className="text-xs text-slate-500">{p.email}</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span>{p.student_count} aluno(s)</span>
+                <span>{p.last_activity ? `última sessão: ${new Date(p.last_activity).toLocaleDateString('pt-BR')}` : 'sem atividade'}</span>
+                <span className={`px-2 py-0.5 rounded-full ${p.active ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{p.active ? 'ativo' : 'inativo'}</span>
+                <button onClick={() => toggleRole(p)} className="text-slate-600 font-medium">
+                  {p.role === 'admin' ? 'Tornar professor' : 'Tornar admin'}
+                </button>
+                <button onClick={() => toggleActive(p)} className="text-[#731919] font-medium">
+                  {p.active ? 'Desativar' : 'Ativar'}
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <span>{p.student_count} aluno(s)</span>
-              <span>{p.last_activity ? `última sessão: ${new Date(p.last_activity).toLocaleDateString('pt-BR')}` : 'sem atividade'}</span>
-              <span className={`px-2 py-0.5 rounded-full ${p.active ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{p.active ? 'ativo' : 'inativo'}</span>
-              <button onClick={() => toggleActive(p)} className="text-[#731919] font-medium">
-                {p.active ? 'Desativar' : 'Ativar'}
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-slate-800 mb-2">Contas vinculadas como aluno</p>
+        <p className="text-xs text-slate-500 mb-2">
+          Estas contas criaram login normalmente mas foram vinculadas a um registro de aluno — por isso não aparecem na lista de professores acima.
+        </p>
+        <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {linkedAccounts.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma conta vinculada como aluno ainda.</p>}
+          {linkedAccounts.map((a) => (
+            <div key={a.id} className="p-3 text-sm flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="font-medium">{a.email}</p>
+                <p className="text-xs text-slate-500">vinculada ao aluno: {a.linked_student_name}</p>
+              </div>
+              <button onClick={() => unlink(a.linked_student_id!)} className="text-xs text-red-600 font-medium">
+                Desvincular
               </button>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -269,6 +327,37 @@ function PermissoesTab() {
 
 type AuditRow = { id: string; entity_table: string; entity_id: string; action: string; old_value: string | null; new_value: string | null; created_at: string }
 
+const ENTITY_LABELS: Record<string, string> = {
+  students: 'aluno',
+  workout_plans: 'treino',
+  workout_exercises: 'exercício',
+  assessments: 'avaliação física',
+  health_history: 'anamnese',
+  medications: 'medicamento',
+  workout_sessions: 'sessão de treino',
+}
+
+function tryParse(str: string | null) {
+  try {
+    return str ? JSON.parse(str) : null
+  } catch {
+    return null
+  }
+}
+
+function friendlyDescription(r: AuditRow) {
+  const label = ENTITY_LABELS[r.entity_table] ?? r.entity_table
+  const obj = tryParse(r.new_value) ?? tryParse(r.old_value)
+  const name = obj?.full_name ?? obj?.exercise_name ?? obj?.name ?? null
+
+  if (r.action === 'insert') {
+    if (r.entity_table === 'students') return `Novo aluno: ${name ?? '(sem nome)'}`
+    return `Novo(a) ${label}${name ? `: ${name}` : ''} registrado(a)`
+  }
+  if (r.action === 'delete') return `${label}${name ? ` (${name})` : ''} excluído(a)`
+  return `${label}${name ? ` de ${name}` : ''} atualizado(a)`
+}
+
 function diffFields(oldStr: string | null, newStr: string | null) {
   try {
     const oldObj = oldStr ? JSON.parse(oldStr) : {}
@@ -287,14 +376,15 @@ function diffFields(oldStr: string | null, newStr: string | null) {
 
 function AuditoriaTab() {
   const [rows, setRows] = useState<AuditRow[]>([])
-  const [entityFilter, setEntityFilter] = useState('todas')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
     supabase
       .from('audit_logs')
       .select('*')
+      .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(150)
       .then(({ data }) => {
@@ -303,40 +393,19 @@ function AuditoriaTab() {
       })
   }, [])
 
-  const entities = Array.from(new Set(rows.map((r) => r.entity_table)))
-  const filtered = entityFilter === 'todas' ? rows : rows.filter((r) => r.entity_table === entityFilter)
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setEntityFilter('todas')}
-          className={`text-xs px-3 py-1.5 rounded-full border ${entityFilter === 'todas' ? 'border-[#C89116] bg-[#C89116]/10' : 'border-slate-300 text-slate-600'}`}
-        >
-          Todas as tabelas
-        </button>
-        {entities.map((e) => (
-          <button
-            key={e}
-            onClick={() => setEntityFilter(e)}
-            className={`text-xs px-3 py-1.5 rounded-full border ${entityFilter === e ? 'border-[#C89116] bg-[#C89116]/10' : 'border-slate-300 text-slate-600'}`}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
+      <p className="text-xs text-slate-400">Mudanças relevantes dos últimos 7 dias.</p>
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {loading && <p className="p-4 text-sm text-slate-500">Carregando...</p>}
-        {!loading && filtered.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhum registro de auditoria ainda.</p>}
-        {filtered.map((r) => {
+        {!loading && rows.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma mudança nos últimos 7 dias.</p>}
+        {rows.map((r) => {
           const diffs = r.action === 'update' ? diffFields(r.old_value, r.new_value) : []
           return (
             <div key={r.id} className="p-3 text-sm">
               <button onClick={() => setExpanded(expanded === r.id ? null : r.id)} className="w-full flex items-center justify-between text-left">
-                <span>
-                  <span className="font-medium">{r.entity_table}</span> · <span className="text-xs text-slate-400">{r.action}</span>
-                </span>
-                <span className="text-xs text-slate-400">{new Date(r.created_at).toLocaleString('pt-BR')}</span>
+                <span>{friendlyDescription(r)}</span>
+                <span className="text-xs text-slate-400 shrink-0 ml-2">{new Date(r.created_at).toLocaleString('pt-BR')}</span>
               </button>
               {expanded === r.id && (
                 <div className="mt-2 text-xs bg-slate-50 rounded-lg p-3 space-y-1">
