@@ -40,7 +40,7 @@ export function CalendarioTab({ studentId, ownerId, readOnly = false }: { studen
   const firstWeekday = month.getDay()
   const days = Array.from({ length: daysInMonth }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1))
 
-  const sessionForDay = (d: Date) => sessions.find((s) => s.session_date === fmtDate(d))
+  const sessionForDay = (d: Date) => sessions.find((s) => s.session_date.slice(0, 10) === fmtDate(d))
 
   const countByPlan: Record<string, number> = {}
   sessions.forEach((s) => {
