@@ -585,6 +585,9 @@ async function evaluateAlertsAgainst(
         rule_id: rule.id,
         level: rule.severity,
         message: rule.message,
+        category: 'cardiovascular',
+        title: rule.name,
+        priority: rule.severity === 'vermelho' ? 'alta' : 'media',
       })
     }
   }

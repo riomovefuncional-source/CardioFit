@@ -7,6 +7,7 @@ const nav = [
   { to: '/financeiro', label: '💰 Financeiro' },
   { to: '/presenca', label: '📅 Presença' },
   { to: '/avaliacoes', label: '📋 Avaliação' },
+  { to: '/alertas', label: '🔔 Alertas' },
   { to: '/configuracoes', label: '⚙️ Gestão' },
 ]
 

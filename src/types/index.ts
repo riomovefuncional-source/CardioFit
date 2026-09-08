@@ -261,6 +261,10 @@ export type Alert = {
   level: 'amarelo' | 'vermelho'
   message: string
   resolved: boolean
+  category: 'cardiovascular' | 'treino' | 'recuperacao' | 'presenca' | 'avaliacao' | 'financeiro'
+  title: string | null
+  priority: 'baixa' | 'media' | 'alta'
+  status: 'novo' | 'visualizado' | 'resolvido'
   created_at: string
 }
 
