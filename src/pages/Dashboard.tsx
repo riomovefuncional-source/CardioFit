@@ -323,7 +323,7 @@ export default function Dashboard() {
       supabase.from('payments').select('amount').eq('status', 'pago').gte('date', iso(prevStart).slice(0, 10)).lt('date', iso(start).slice(0, 10)),
       supabase.from('cardio_readiness').select('ipc_score').gte('reading_date', iso(start).slice(0, 10)).not('ipc_score', 'is', null),
       supabase.from('cardio_readiness').select('ipc_score').gte('reading_date', iso(prevStart).slice(0, 10)).lt('reading_date', iso(start).slice(0, 10)).not('ipc_score', 'is', null),
-      supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'novo'),
+      supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'novo').in('category', ['presenca','avaliacao','financeiro']),
     ])
 
     const attPct = (rows: any[] | null) => (rows && rows.length ? Math.round((rows.filter((r) => r.status === 'presente').length / rows.length) * 100) : 0)
@@ -351,10 +351,10 @@ export default function Dashboard() {
   }
 
   const loadAttention = async (start: Date) => {
-    const items: Attention[] = []
+    const items: (Attention & { category: 'presenca' | 'avaliacao' | 'financeiro' })[] = []
     const cutoff = start.toISOString().slice(0, 10)
 
-    const { data: students } = await supabase.from('students').select('id, full_name').eq('status', 'ativo')
+    const { data: students } = await supabase.from('students').select('id, full_name, owner_id').eq('status', 'ativo')
     const { data: lastSessions } = await supabase.from('workout_sessions').select('student_id, session_date').order('session_date', { ascending: false })
     const lastByStudent = new Map<string, string>()
     ;(lastSessions ?? []).forEach((s) => {
@@ -363,20 +363,50 @@ export default function Dashboard() {
     ;(students ?? []).forEach((s) => {
       const last = lastByStudent.get(s.id)
       if (!last || last < cutoff) {
-        items.push({ student_id: s.id, name: s.full_name, reason: last ? 'Sem treinar há mais de um período' : 'Nunca registrou sessão', date: last ?? '-', severity: 'media' })
+        items.push({ student_id: s.id, name: s.full_name, reason: last ? 'Sem treinar há mais de um período' : 'Nunca registrou sessão', date: last ?? '-', severity: 'media', category: 'presenca' })
       }
     })
 
     const { data: overdue } = await supabase.from('payments').select('contract_id, date, student_contracts(student_id, students(id, full_name))').eq('status', 'atrasado')
     ;(overdue ?? []).forEach((p: any) => {
       const s = p.student_contracts?.students
-      if (s) items.push({ student_id: s.id, name: s.full_name, reason: 'Pagamento em atraso', date: p.date, severity: 'alta' })
+      if (s) items.push({ student_id: s.id, name: s.full_name, reason: 'Pagamento em atraso', date: p.date, severity: 'alta', category: 'financeiro' })
     })
 
-    const { data: openAlertsData } = await supabase.from('alerts').select('student_id, message, created_at, students(full_name)').eq('status', 'novo').eq('category', 'cardiovascular').limit(20)
-    ;(openAlertsData ?? []).forEach((a: any) => {
-      items.push({ student_id: a.student_id, name: a.students?.full_name ?? '-', reason: `Alerta cardiovascular: ${a.message}`, date: a.created_at, severity: 'alta' })
+    const { data: assessedStudents } = await supabase.from('assessments').select('student_id')
+    const assessedSet = new Set((assessedStudents ?? []).map((a) => a.student_id))
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)
+    const { data: lastAssessments } = await supabase.from('assessments').select('student_id, assessment_date').order('assessment_date', { ascending: false })
+    const lastAssessByStudent = new Map<string, string>()
+    ;(lastAssessments ?? []).forEach((a) => {
+      if (!lastAssessByStudent.has(a.student_id)) lastAssessByStudent.set(a.student_id, a.assessment_date)
     })
+    ;(students ?? []).forEach((s) => {
+      const last = lastAssessByStudent.get(s.id)
+      if (!assessedSet.has(s.id) || (last && last < ninetyDaysAgo)) {
+        items.push({ student_id: s.id, name: s.full_name, reason: last ? 'Avaliação atrasada (+90 dias)' : 'Nunca avaliado', date: last ?? '-', severity: 'media', category: 'avaliacao' })
+      }
+    })
+
+    // Cria um registro real em "alerts" para cada pendência que ainda não tenha um alerta em aberto
+    const ownerByStudent = new Map((students ?? []).map((s) => [s.id, s.owner_id]))
+    const { data: openAlerts } = await supabase.from('alerts').select('student_id, category').in('status', ['novo', 'visualizado'])
+    const openSet = new Set((openAlerts ?? []).map((a) => `${a.student_id}:${a.category}`))
+    const toInsert = items
+      .filter((it) => !openSet.has(`${it.student_id}:${it.category}`))
+      .map((it) => ({
+        student_id: it.student_id,
+        owner_id: ownerByStudent.get(it.student_id),
+        source_table: 'dashboard',
+        source_id: it.student_id,
+        level: it.severity === 'alta' ? 'vermelho' : 'amarelo',
+        category: it.category,
+        title: it.reason,
+        message: it.reason,
+        priority: it.severity === 'alta' ? 'alta' : 'media',
+        status: 'novo',
+      }))
+    if (toInsert.length) await supabase.from('alerts').insert(toInsert)
 
     setAttention(items.slice(0, 15))
   }

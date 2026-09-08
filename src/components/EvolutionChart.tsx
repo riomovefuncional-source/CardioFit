@@ -3,10 +3,12 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { supabase } from '../lib/supabaseClient'
 
 type WeightPoint = { date: string; weight: number | null; bodyFat: number | null }
+type SelfWeightPoint = { date: string; selfWeight: number }
 type LoadPoint = { date: string; load: number | null }
 
 export default function EvolutionChart({ studentId }: { studentId: string }) {
   const [weightData, setWeightData] = useState<WeightPoint[]>([])
+  const [selfWeightData, setSelfWeightData] = useState<SelfWeightPoint[]>([])
   const [loadData, setLoadData] = useState<LoadPoint[]>([])
   const [radarData, setRadarData] = useState<{ metric: string; inicial: number; atual: number }[]>([])
 
@@ -24,6 +26,15 @@ export default function EvolutionChart({ studentId }: { studentId: string }) {
             bodyFat: d.body_fat_pct,
           }))
         )
+      })
+
+    supabase
+      .from('student_weight_logs')
+      .select('logged_at, weight_kg')
+      .eq('student_id', studentId)
+      .order('logged_at', { ascending: true })
+      .then(({ data }) => {
+        setSelfWeightData((data ?? []).map((d) => ({ date: new Date(d.logged_at).toLocaleDateString('pt-BR'), selfWeight: d.weight_kg })))
       })
 
     supabase
@@ -89,6 +100,21 @@ export default function EvolutionChart({ studentId }: { studentId: string }) {
           </ResponsiveContainer>
         )}
       </div>
+
+      {selfWeightData.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <p className="text-sm font-medium text-slate-700 mb-3">Peso auto-registrado pelo aluno</p>
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={selfWeightData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="selfWeight" stroke="#C89116" name="Peso (kg)" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-xl p-5">
         <p className="text-sm font-medium text-slate-700 mb-3">Carga de treino por sessão (duração × PSE)</p>

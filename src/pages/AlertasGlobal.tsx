@@ -16,9 +16,6 @@ type AlertRow = {
 }
 
 const CATEGORIES = [
-  { id: 'cardiovascular', label: 'Cardiovascular' },
-  { id: 'treino', label: 'Treino' },
-  { id: 'recuperacao', label: 'Recuperação' },
   { id: 'presenca', label: 'Presença' },
   { id: 'avaliacao', label: 'Avaliação' },
   { id: 'financeiro', label: 'Financeiro' },
@@ -38,6 +35,7 @@ export default function AlertasGlobal() {
     supabase
       .from('alerts')
       .select('id, student_id, category, title, message, level, priority, status, created_at, students(full_name)')
+      .in('category', ['presenca', 'avaliacao', 'financeiro'])
       .order('created_at', { ascending: false })
       .limit(200)
       .then(({ data }) => {

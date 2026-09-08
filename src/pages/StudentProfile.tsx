@@ -959,6 +959,7 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
   const [history, setHistory] = useState<any[]>([])
+  const [expandedCheckin, setExpandedCheckin] = useState<any | null>(null)
 
   const loadHistory = () =>
     supabase
@@ -1084,7 +1085,7 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
       <div className="divide-y divide-slate-100">
         {history.length === 0 && <p className="text-sm text-slate-500 py-2">Nenhum check-in registrado ainda.</p>}
         {history.map((h) => (
-          <div key={h.id} className="py-2 text-sm flex flex-wrap justify-between gap-2">
+          <button key={h.id} onClick={() => setExpandedCheckin(h)} className="w-full text-left py-2 text-sm flex flex-wrap justify-between gap-2 hover:bg-slate-50 rounded-lg px-1">
             <span className="text-slate-500">{new Date(h.checkin_at).toLocaleString('pt-BR')}</span>
             <span
               className={`text-xs px-2 py-0.5 rounded-full ${h.origin === 'aluno' ? 'bg-[#C89116]/10 text-[#731919]' : 'bg-slate-100 text-slate-600'}`}
@@ -1094,10 +1095,84 @@ function PreTreinoCheckin({ studentId, ownerId }: { studentId: string; ownerId: 
             <span className="text-slate-500 text-xs">
               sono {h.sleep_quality ?? '-'} · energia {h.energy_level ?? '-'} · dor {h.pain_level ?? '-'}
             </span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
+
+    {expandedCheckin && (
+      <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50" onClick={() => setExpandedCheckin(null)}>
+        <div className="bg-white rounded-xl p-6 max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">Check-in de {new Date(expandedCheckin.checkin_at).toLocaleString('pt-BR')}</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${expandedCheckin.origin === 'aluno' ? 'bg-[#C89116]/10 text-[#731919]' : 'bg-slate-100 text-slate-600'}`}>
+              {expandedCheckin.origin === 'aluno' ? 'enviado pelo aluno' : 'registrado pelo profissional'}
+            </span>
+          </div>
+
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Sono: {expandedCheckin.sleep_hours ?? '-'}h</p>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <span key={n} className={`h-8 flex-1 rounded-md text-xs font-medium flex items-center justify-center border ${expandedCheckin.sleep_quality === n ? 'bg-[#731919] text-white border-[#731919]' : 'border-slate-200 text-slate-400'}`}>
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {(
+            [
+              ['Energia', 'energy_level'],
+              ['Disposição', 'disposition'],
+              ['Estresse', 'stress_level'],
+            ] as const
+          ).map(([label, key]) => (
+            <div key={key}>
+              <p className="text-xs text-slate-400 mb-1">{label}</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <span
+                    key={n}
+                    className={`h-8 flex-1 rounded-md text-xs font-medium flex items-center justify-center border ${
+                      (expandedCheckin as any)[key] === n ? 'bg-[#731919] text-white border-[#731919]' : 'border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Dor: {expandedCheckin.pain_level ?? '-'}/10</p>
+            <div className="flex flex-wrap gap-2">
+              {PAIN_REGIONS_SESSION.map((r) => (
+                <span
+                  key={r}
+                  className={`text-xs px-2 py-1 rounded-full border ${
+                    expandedCheckin.pain_regions?.includes(r) ? 'bg-amber-600 text-white border-amber-600' : 'border-slate-200 text-slate-400'
+                  }`}
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {(expandedCheckin.systolic_bp || expandedCheckin.heart_rate || expandedCheckin.spo2) && (
+            <p className="text-xs text-slate-500">
+              PA {expandedCheckin.systolic_bp ?? '-'}/{expandedCheckin.diastolic_bp ?? '-'} · FC {expandedCheckin.heart_rate ?? '-'} · SpO2 {expandedCheckin.spo2 ?? '-'}%
+            </p>
+          )}
+
+          <button onClick={() => setExpandedCheckin(null)} className="text-sm text-slate-400">
+            Fechar
+          </button>
+        </div>
+      </div>
+    )}
     </>
   )
 }
@@ -1317,9 +1392,12 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
   const [contract, setContract] = useState<StudentContract | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
   const [form, setForm] = useState({ agreed_value: '', due_day: '', periodicity: 'mensal' })
+  const [editingContract, setEditingContract] = useState(false)
   const [saving, setSaving] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [payDue, setPayDue] = useState('')
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ amount: '', due_date: '' })
 
   const load = async () => {
     const { data: c } = await supabase
@@ -1359,6 +1437,32 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
     load()
   }
 
+  const startEditContract = () => {
+    if (!contract) return
+    setForm({ agreed_value: String(contract.agreed_value), due_day: contract.due_day ? String(contract.due_day) : '', periodicity: contract.periodicity })
+    setEditingContract(true)
+  }
+
+  const saveContractEdit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!contract) return
+    setSaving(true)
+    await supabase
+      .from('student_contracts')
+      .update({ agreed_value: Number(form.agreed_value), due_day: form.due_day ? Number(form.due_day) : null, periodicity: form.periodicity })
+      .eq('id', contract.id)
+    setSaving(false)
+    setEditingContract(false)
+    load()
+  }
+
+  const deleteContract = async () => {
+    if (!contract) return
+    if (!confirm('Excluir este contrato? Os pagamentos lançados nele também serão removidos. Essa ação não pode ser desfeita.')) return
+    await supabase.from('student_contracts').delete().eq('id', contract.id)
+    load()
+  }
+
   const addPayment = async (e: FormEvent) => {
     e.preventDefault()
     if (!contract) return
@@ -1382,6 +1486,23 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
       .from('payments')
       .update({ status: 'pago', paid_date: new Date().toISOString().slice(0, 10) })
       .eq('id', paymentId)
+    load()
+  }
+
+  const startEditPayment = (p: Payment) => {
+    setEditingPaymentId(p.id)
+    setEditForm({ amount: String(p.amount), due_date: p.due_date })
+  }
+
+  const saveEditPayment = async (paymentId: string) => {
+    await supabase.from('payments').update({ amount: Number(editForm.amount), due_date: editForm.due_date }).eq('id', paymentId)
+    setEditingPaymentId(null)
+    load()
+  }
+
+  const deletePayment = async (paymentId: string) => {
+    if (!confirm('Excluir este lançamento? Essa ação não pode ser desfeita.')) return
+    await supabase.from('payments').delete().eq('id', paymentId)
     load()
   }
 
@@ -1416,10 +1537,52 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
   return (
     <div className="space-y-6">
       <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <p className="text-sm text-slate-500">Valor acordado</p>
-        <p className="text-xl font-semibold text-slate-900">
-          R$ {contract.agreed_value.toFixed(2)} · vencimento dia {contract.due_day ?? '-'} · {contract.periodicity}
-        </p>
+        {!editingContract ? (
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm text-slate-500">Valor acordado</p>
+              <p className="text-xl font-semibold text-slate-900">
+                R$ {contract.agreed_value.toFixed(2)} · vencimento dia {contract.due_day ?? '-'} · {contract.periodicity}
+              </p>
+            </div>
+            <div className="flex gap-3 text-xs">
+              <button onClick={startEditContract} className="text-[#731919] font-medium">
+                Editar contrato
+              </button>
+              <button onClick={deleteContract} className="text-red-600 font-medium">
+                Excluir contrato
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={saveContractEdit} className="grid sm:grid-cols-3 gap-3">
+            <Field label="Valor acordado (R$)">
+              <input className="input" type="number" step="0.01" required value={form.agreed_value} onChange={(e) => setForm({ ...form, agreed_value: e.target.value })} />
+            </Field>
+            <Field label="Dia de vencimento">
+              <input className="input" type="number" min="1" max="31" value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} />
+            </Field>
+            <Field label="Periodicidade">
+              <select className="input" value={form.periodicity} onChange={(e) => setForm({ ...form, periodicity: e.target.value })}>
+                <option value="semanal">Semanal</option>
+                <option value="quinzenal">Quinzenal</option>
+                <option value="mensal">Mensal</option>
+                <option value="trimestral">Trimestral</option>
+                <option value="semestral">Semestral</option>
+                <option value="anual">Anual</option>
+                <option value="personalizada">Personalizada</option>
+              </select>
+            </Field>
+            <div className="sm:col-span-3 flex gap-2">
+              <button disabled={saving} className="btn-primary">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+              <button type="button" onClick={() => setEditingContract(false)} className="text-sm text-slate-500">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       <form onSubmit={addPayment} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-3 items-end">
@@ -1436,27 +1599,50 @@ function FinanceiroTab({ studentId, ownerId }: { studentId: string; ownerId: str
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {payments.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma cobrança lançada.</p>}
-        {payments.map((p) => (
-          <div key={p.id} className="p-4 text-sm flex justify-between items-center">
-            <span>
-              R$ {p.amount.toFixed(2)} · venc. {new Date(p.due_date).toLocaleDateString('pt-BR')}
-            </span>
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-xs px-2 py-1 rounded-full ${
-                  p.status === 'pago' ? 'bg-emerald-50 text-emerald-700' : p.status === 'atrasado' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
-                }`}
-              >
-                {p.status}
-              </span>
-              {p.status !== 'pago' && (
-                <button onClick={() => markPaid(p.id)} className="text-xs text-[#731919] hover:underline">
-                  marcar pago
-                </button>
-              )}
+        {payments.map((p) =>
+          editingPaymentId === p.id ? (
+            <div key={p.id} className="p-4 text-sm flex flex-wrap gap-3 items-end bg-slate-50">
+              <Field label="Valor (R$)">
+                <input className="input w-32" type="number" step="0.01" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} />
+              </Field>
+              <Field label="Vencimento">
+                <input className="input" type="date" value={editForm.due_date} onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} />
+              </Field>
+              <button onClick={() => saveEditPayment(p.id)} className="btn-primary text-sm">
+                Salvar
+              </button>
+              <button onClick={() => setEditingPaymentId(null)} className="text-sm text-slate-500">
+                Cancelar
+              </button>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div key={p.id} className="p-4 text-sm flex justify-between items-center flex-wrap gap-2">
+              <span>
+                R$ {p.amount.toFixed(2)} · venc. {new Date(p.due_date).toLocaleDateString('pt-BR')}
+              </span>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    p.status === 'pago' ? 'bg-emerald-50 text-emerald-700' : p.status === 'atrasado' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {p.status}
+                </span>
+                {p.status !== 'pago' && (
+                  <button onClick={() => markPaid(p.id)} className="text-xs text-[#731919] hover:underline">
+                    marcar pago
+                  </button>
+                )}
+                <button onClick={() => startEditPayment(p)} className="text-xs text-slate-600 hover:underline">
+                  editar
+                </button>
+                <button onClick={() => deletePayment(p.id)} className="text-xs text-red-600 hover:underline">
+                  excluir
+                </button>
+              </div>
+            </div>
+          ),
+        )}
       </div>
     </div>
   )

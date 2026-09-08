@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import Configuracoes from './Configuracoes'
 
-const ADMIN_ONLY_TABS = ['Professores', 'Permissões', 'Auditoria'] as const
-const ALL_TABS = ['Professores', 'Exercícios', 'Permissões', 'Regras', 'Auditoria'] as const
+const ADMIN_ONLY_TABS = ['Professores', 'Permissões'] as const
+const ALL_TABS = ['Professores', 'Exercícios', 'Permissões', 'Regras', 'Armazenamento'] as const
 type SubTab = (typeof ALL_TABS)[number]
 
 export default function Gestao() {
@@ -36,7 +36,7 @@ export default function Gestao() {
       {tab === 'Exercícios' && <ExerciciosTab />}
       {tab === 'Permissões' && isAdmin && <PermissoesTab />}
       {tab === 'Regras' && <Configuracoes />}
-      {tab === 'Auditoria' && isAdmin && <AuditoriaTab />}
+      {tab === 'Armazenamento' && <ArmazenamentoTab />}
     </div>
   )
 }
@@ -325,104 +325,69 @@ function PermissoesTab() {
   )
 }
 
-type AuditRow = { id: string; entity_table: string; entity_id: string; action: string; old_value: string | null; new_value: string | null; created_at: string }
+function ArmazenamentoTab() {
+  const [usage, setUsage] = useState<{ bytes: number; pretty: string } | null>(null)
+  const [error, setError] = useState('')
+  const [cleaning, setCleaning] = useState(false)
+  const [cleanMsg, setCleanMsg] = useState('')
 
-const ENTITY_LABELS: Record<string, string> = {
-  students: 'aluno',
-  workout_plans: 'treino',
-  workout_exercises: 'exercício',
-  assessments: 'avaliação física',
-  health_history: 'anamnese',
-  medications: 'medicamento',
-  workout_sessions: 'sessão de treino',
-}
-
-function tryParse(str: string | null) {
-  try {
-    return str ? JSON.parse(str) : null
-  } catch {
-    return null
-  }
-}
-
-function friendlyDescription(r: AuditRow) {
-  const label = ENTITY_LABELS[r.entity_table] ?? r.entity_table
-  const obj = tryParse(r.new_value) ?? tryParse(r.old_value)
-  const name = obj?.full_name ?? obj?.exercise_name ?? obj?.name ?? null
-
-  if (r.action === 'insert') {
-    if (r.entity_table === 'students') return `Novo aluno: ${name ?? '(sem nome)'}`
-    return `Novo(a) ${label}${name ? `: ${name}` : ''} registrado(a)`
-  }
-  if (r.action === 'delete') return `${label}${name ? ` (${name})` : ''} excluído(a)`
-  return `${label}${name ? ` de ${name}` : ''} atualizado(a)`
-}
-
-function diffFields(oldStr: string | null, newStr: string | null) {
-  try {
-    const oldObj = oldStr ? JSON.parse(oldStr) : {}
-    const newObj = newStr ? JSON.parse(newStr) : {}
-    const keys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)])
-    const diffs: { field: string; before: any; after: any }[] = []
-    keys.forEach((k) => {
-      if (k === 'updated_at' || k === 'created_at') return
-      if (JSON.stringify(oldObj[k]) !== JSON.stringify(newObj[k])) diffs.push({ field: k, before: oldObj[k], after: newObj[k] })
+  const load = () => {
+    supabase.rpc('get_storage_usage').then(({ data, error }) => {
+      if (error) setError(error.message)
+      else if (data && data[0]) setUsage(data[0])
     })
-    return diffs
-  } catch {
-    return []
   }
-}
-
-function AuditoriaTab() {
-  const [rows, setRows] = useState<AuditRow[]>([])
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-    supabase
-      .from('audit_logs')
-      .select('*')
-      .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false })
-      .limit(150)
-      .then(({ data }) => {
-        setRows((data as AuditRow[]) ?? [])
-        setLoading(false)
-      })
+    load()
   }, [])
 
+  // Free tier do Supabase costuma ser 500MB — usamos isso como referência de alerta.
+  const LIMIT_BYTES = 500 * 1024 * 1024
+  const pct = usage ? Math.min(100, Math.round((usage.bytes / LIMIT_BYTES) * 100)) : 0
+  const warn = pct >= 80
+
+  const cleanup = async () => {
+    if (!confirm('Excluir alertas resolvidos com mais de 90 dias? Essa ação não pode ser desfeita.')) return
+    setCleaning(true)
+    const { data, error } = await supabase.rpc('cleanup_resolved_alerts', { p_older_than_days: 90 })
+    setCleaning(false)
+    if (!error) {
+      setCleanMsg(`${data} alerta(s) antigos removidos.`)
+      load()
+    }
+  }
+
+  if (error) {
+    return <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">Não foi possível carregar: {error}</div>
+  }
+
   return (
-    <div className="space-y-4">
-      <p className="text-xs text-slate-400">Mudanças relevantes dos últimos 7 dias.</p>
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {loading && <p className="p-4 text-sm text-slate-500">Carregando...</p>}
-        {!loading && rows.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma mudança nos últimos 7 dias.</p>}
-        {rows.map((r) => {
-          const diffs = r.action === 'update' ? diffFields(r.old_value, r.new_value) : []
-          return (
-            <div key={r.id} className="p-3 text-sm">
-              <button onClick={() => setExpanded(expanded === r.id ? null : r.id)} className="w-full flex items-center justify-between text-left">
-                <span>{friendlyDescription(r)}</span>
-                <span className="text-xs text-slate-400 shrink-0 ml-2">{new Date(r.created_at).toLocaleString('pt-BR')}</span>
-              </button>
-              {expanded === r.id && (
-                <div className="mt-2 text-xs bg-slate-50 rounded-lg p-3 space-y-1">
-                  {r.action === 'update' && diffs.length > 0 ? (
-                    diffs.map((d) => (
-                      <p key={d.field}>
-                        <span className="font-medium">{d.field}</span>: <span className="text-red-600">{JSON.stringify(d.before)}</span> → <span className="text-green-600">{JSON.stringify(d.after)}</span>
-                      </p>
-                    ))
-                  ) : (
-                    <p className="text-slate-500">{r.action === 'insert' ? 'Registro criado.' : r.action === 'delete' ? 'Registro excluído.' : 'Sem alterações de campo detectadas.'}</p>
-                  )}
-                </div>
-              )}
+    <div className="space-y-4 max-w-lg">
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <p className="text-sm font-semibold text-slate-800 mb-2">Uso de armazenamento do banco</p>
+        {!usage ? (
+          <p className="text-sm text-slate-500">Carregando...</p>
+        ) : (
+          <>
+            <p className="text-2xl font-bold text-slate-900">{usage.pretty}</p>
+            <div className="h-2 rounded-full bg-slate-100 mt-2 overflow-hidden">
+              <div className={`h-full rounded-full ${warn ? 'bg-red-500' : 'bg-[#731919]'}`} style={{ width: `${pct}%` }} />
             </div>
-          )
-        })}
+            <p className={`text-xs mt-2 ${warn ? 'text-red-600' : 'text-slate-400'}`}>
+              {warn
+                ? `Atenção: uso estimado em ${pct}% de um limite de referência de 500MB (plano gratuito do Supabase). Considere limpar dados antigos.`
+                : `${pct}% de um limite de referência de 500MB.`}
+            </p>
+          </>
+        )}
+      </div>
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <p className="text-sm font-semibold text-slate-800 mb-1">Liberar espaço</p>
+        <p className="text-xs text-slate-500 mb-3">Remove alertas já marcados como resolvidos há mais de 90 dias. Não afeta alunos, treinos, avaliações ou financeiro.</p>
+        <button onClick={cleanup} disabled={cleaning} className="btn-primary text-sm">
+          {cleaning ? 'Limpando...' : 'Limpar alertas antigos resolvidos'}
+        </button>
+        {cleanMsg && <p className="text-xs text-green-700 mt-2">{cleanMsg}</p>}
       </div>
     </div>
   )
