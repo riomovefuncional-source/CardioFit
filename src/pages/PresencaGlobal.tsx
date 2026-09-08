@@ -7,7 +7,7 @@ type Row = {
   attendance_date: string
   status: string
   student_id: string
-  students: { name: string } | null
+  students: { full_name: string } | null
 }
 
 export default function PresencaGlobal() {
@@ -18,7 +18,7 @@ export default function PresencaGlobal() {
   useEffect(() => {
     supabase
       .from('attendance')
-      .select('id, attendance_date, status, student_id, students(name)')
+      .select('id, attendance_date, status, student_id, students(full_name)')
       .order('attendance_date', { ascending: false })
       .limit(200)
       .then(({ data }) => {
@@ -77,7 +77,7 @@ export default function PresencaGlobal() {
         {!loading && filtered.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhum registro de presença ainda.</p>}
         {filtered.map((r) => (
           <Link key={r.id} to={`/alunos/${r.student_id}`} className="p-3 text-sm flex justify-between hover:bg-slate-50">
-            <span className="font-medium">{r.students?.name ?? '-'}</span>
+            <span className="font-medium">{r.students?.full_name ?? '-'}</span>
             <span>{new Date(r.attendance_date).toLocaleDateString('pt-BR')}</span>
             <span
               className={`text-xs px-2 py-0.5 rounded-full ${

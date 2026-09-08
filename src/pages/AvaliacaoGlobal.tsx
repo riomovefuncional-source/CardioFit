@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
-type AssessmentRow = { id: string; student_id: string; assessment_date: string; students: { name: string } | null }
-type StudentRow = { id: string; name: string }
+type AssessmentRow = { id: string; student_id: string; assessment_date: string; students: { full_name: string } | null }
+type StudentRow = { id: string; full_name: string }
 
 export default function AvaliacaoGlobal() {
   const [recent, setRecent] = useState<AssessmentRow[]>([])
@@ -12,8 +12,8 @@ export default function AvaliacaoGlobal() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('assessments').select('id, student_id, assessment_date, students(name)').order('assessment_date', { ascending: false }).limit(30),
-      supabase.from('students').select('id, name').eq('status', 'ativo'),
+      supabase.from('assessments').select('id, student_id, assessment_date, students(full_name)').order('assessment_date', { ascending: false }).limit(30),
+      supabase.from('students').select('id, full_name').eq('status', 'ativo'),
       supabase.from('assessments').select('student_id'),
     ]).then(([recentRes, studentsRes, allAssessRes]) => {
       setRecent((recentRes.data as any) ?? [])
@@ -53,7 +53,7 @@ export default function AvaliacaoGlobal() {
           <div className="bg-white border border-amber-200 rounded-xl divide-y divide-slate-100">
             {pending.map((s) => (
               <Link key={s.id} to={`/alunos/${s.id}`} className="p-3 text-sm flex justify-between hover:bg-slate-50">
-                <span>{s.name}</span>
+                <span>{s.full_name}</span>
                 <span className="text-amber-600 text-xs">Avaliar agora →</span>
               </Link>
             ))}
@@ -67,7 +67,7 @@ export default function AvaliacaoGlobal() {
           {!loading && recent.length === 0 && <p className="p-4 text-sm text-slate-500">Nenhuma avaliação registrada ainda.</p>}
           {recent.map((r) => (
             <Link key={r.id} to={`/alunos/${r.student_id}`} className="p-3 text-sm flex justify-between hover:bg-slate-50">
-              <span className="font-medium">{r.students?.name ?? '-'}</span>
+              <span className="font-medium">{r.students?.full_name ?? '-'}</span>
               <span className="text-slate-500">{new Date(r.assessment_date).toLocaleDateString('pt-BR')}</span>
             </Link>
           ))}

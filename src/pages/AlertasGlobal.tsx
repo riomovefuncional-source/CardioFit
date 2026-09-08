@@ -12,7 +12,7 @@ type AlertRow = {
   priority: 'baixa' | 'media' | 'alta'
   status: 'novo' | 'visualizado' | 'resolvido'
   created_at: string
-  students: { name: string } | null
+  students: { full_name: string } | null
 }
 
 const CATEGORIES = [
@@ -37,7 +37,7 @@ export default function AlertasGlobal() {
   const load = () =>
     supabase
       .from('alerts')
-      .select('id, student_id, category, title, message, level, priority, status, created_at, students(name)')
+      .select('id, student_id, category, title, message, level, priority, status, created_at, students(full_name)')
       .order('created_at', { ascending: false })
       .limit(200)
       .then(({ data }) => {
@@ -121,7 +121,7 @@ export default function AlertasGlobal() {
             <span className={`text-xs px-2 py-0.5 rounded-full ${PRIORITY_COLOR[a.priority]}`}>{a.priority}</span>
             <span className="text-xs text-slate-400 capitalize w-28 shrink-0">{CATEGORIES.find((c) => c.id === a.category)?.label ?? a.category}</span>
             <span className="flex-1 truncate">
-              <span className="font-medium">{a.students?.name ?? '-'}</span> — {a.title || a.message}
+              <span className="font-medium">{a.students?.full_name ?? '-'}</span> — {a.title || a.message}
             </span>
             <span className="text-xs text-slate-400 shrink-0">{new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
             <span
@@ -142,7 +142,7 @@ export default function AlertasGlobal() {
             <p className="text-lg font-semibold">{selected.title || selected.message}</p>
             <p className="text-sm text-slate-600">{selected.message}</p>
             <p className="text-xs text-slate-400">
-              Aluno: <span className="font-medium text-slate-700">{selected.students?.name}</span> · {new Date(selected.created_at).toLocaleString('pt-BR')}
+              Aluno: <span className="font-medium text-slate-700">{selected.students?.full_name}</span> · {new Date(selected.created_at).toLocaleString('pt-BR')}
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
               <Link to={`/alunos/${selected.student_id}`} className="btn-primary text-sm">

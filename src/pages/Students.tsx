@@ -1,17 +1,27 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import type { Student } from '../types'
 
 export default function Students() {
   const { session } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(searchParams.get('new') === '1')
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true)
+      searchParams.delete('new')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const load = async () => {
     setLoading(true)

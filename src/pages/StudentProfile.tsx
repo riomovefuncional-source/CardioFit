@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import type {
@@ -49,9 +49,11 @@ const SYMPTOM_OPTIONS = [
 
 export default function StudentProfile() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const { session } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
-  const [tab, setTab] = useState<Tab>('Geral')
+  const initialTab = (searchParams.get('tab') as Tab) ?? 'Geral'
+  const [tab, setTab] = useState<Tab>(TABS.includes(initialTab) ? initialTab : 'Geral')
 
   useEffect(() => {
     if (!id) return
